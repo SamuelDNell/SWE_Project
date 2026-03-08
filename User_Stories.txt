@@ -3,15 +3,15 @@ User stories in order of priority
 Story #1
 As a user
 
-So that I can access my private converstions 
+So that I can access my private conversations 
 
 I want to be able to sign in with my username and password
 
 
 Story #2
-As a prospecrive user
+As a prospective user
 
-So that I can create an acccount 
+So that I can create an account 
 
 I want a sign up button
 
@@ -21,11 +21,11 @@ As a user
 
 So that I don't get locked out 
 
-I want to be able to to reset my password
+I want to be able to reset my password
 
 Story #4
 As a user
 
-So that I don't have to manage seperate passwords
+So that I don't have to manage separate passwords
 
-I want to login withh RU CAS
+I want to login with RU CAS
