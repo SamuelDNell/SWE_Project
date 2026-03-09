@@ -1,6 +1,8 @@
+In iteration 1 we will complete stories 1-3. Story 4 will be completed if time permits.
+
 User stories in order of priority
 
-Story #1
+Story #1 - 3 Point Story
 As a user
 
 So that I can access my private conversations 
@@ -8,7 +10,7 @@ So that I can access my private conversations
 I want to be able to sign in with my username and password
 
 
-Story #2
+Story #2 - 2 Point Story
 As a prospective user
 
 So that I can create an account 
@@ -16,14 +18,14 @@ So that I can create an account
 I want a sign up button
 
 
-Story #3
+Story #3 - 1 Point Story
 As a user 
 
 So that I don't get locked out 
 
 I want to be able to reset my password
 
-Story #4
+Story #4 - 3 Point Story
 As a user
 
 So that I don't have to manage separate passwords
