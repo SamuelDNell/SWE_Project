@@ -1,0 +1,5 @@
+Landing Page
+Login Page
+Create Account
+LLM Page (Chats)
+Password Reset Page
