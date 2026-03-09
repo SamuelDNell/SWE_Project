@@ -2,4 +2,4 @@ Landing Page
 Login Page
 Create Account
 LLM Page (Chats)
-Password Reset Page
+Password Reset Page 1 and 2 (1 is request, 2 is change)
