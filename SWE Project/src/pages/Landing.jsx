@@ -1,22 +1,20 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import styles from './Landing.module.css'
 
 export default function Landing() {
   const navigate = useNavigate()
 
   return (
-    <>
-      <div style={{ display: "flex", flexDirection: "column", gap: "1rem", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+    <div className = {styles.page}>
       <div>
-        <h1 style={{ marginBottom: "2rem"}}>LLM Web Interface</h1>
-        <h2>Ask questions to our AI powered system!</h2>
+        <h1 className = {styles.title}>Welcome to Knightly!</h1>
+        <h2 className = {styles.subtitle}>Ask questions to our AI powered system!</h2>
+        <h3 className = {styles.subsubtitle}>Made by Scarlet Knights, for Scarlet Knights.</h3>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "2rem", width: "300px", transform: "translateY(6rem)"}}>
-        <button onClick={() => navigate('/login')}>Login</button>
-        <button onClick={() => navigate('/create-account')}>Create Account</button>
-        <button onClick={() => navigate('/login')}>Login with Rutgers CAS</button>
+      <div className = {styles.card}>
+        <button className = {styles.navBtn} onClick={() => navigate ('/login')}>Log in</button>
+        <button className = {styles.navBtn} onClick={() => navigate ('/create-account')}>Create an account</button>
       </div>
     </div>
-    </>
   )
 }
