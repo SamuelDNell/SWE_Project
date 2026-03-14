@@ -1,0 +1,90 @@
+.page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: Canvas;
+}
+
+.card {
+    background-color: Canvas;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+    border: 1px solid GrayText;
+    padding: 2.5rem 2rem;
+    width: 100%;
+    max-width: 380px;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.title {
+    text-align: center;
+    font-size: 22px;
+    font-weight: 500;
+    color: CanvasText;
+    margin-bottom: 0.5rem;
+}
+
+.field {
+    position: relative;
+}
+
+.field input {
+    width: 100%;
+    height: 52px;
+    padding: 18px 14px 6px;
+    font-size: 15px;
+    border: 1.5px solid GrayText;
+    border-radius: 8px;
+    background-color: Canvas;
+    color: CanvasText;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.field input:focus {
+    border-color: #378ADD;
+}
+
+.field label {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 15px;
+    color: GrayText;
+    pointer-events: none;
+    transition: all 0.15s;
+}
+
+.field input:focus + label,
+.field input:not(:placeholder-shown) + label {
+    top: 10px;
+    transform: none;
+    font-size: 11px;
+    color: #378ADD;
+}
+
+.field input:not(:focus):not(:placeholder-shown) + label {
+    color: GrayText;
+}
+
+.backBtn {
+    width: 100%;
+    height: 48px;
+    background: #3B3B3B;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    margin-top: 0.5rem;
+    transition: background 0.15s;
+}
+
+.backBtn:hover {
+    background: #880011;
+}
