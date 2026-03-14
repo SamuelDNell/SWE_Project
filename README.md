@@ -9,6 +9,9 @@
 5. Ensure Ollama is running locally
 6. Run the server: `npm run dev`
 
+## Frontend Setup
+Similar to backend, navigate to frontend using cd and then npm install, followed by npm run dev
+
 ### Authentication
 - JWT-based authentication system for secure user sessions
 - Password hashing using bcryptjs for secure storage
