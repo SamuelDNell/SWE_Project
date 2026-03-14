@@ -40,3 +40,6 @@
 - POST /api/auth/reset-password - Reset password (placeholder)
 - GET /api/chat/models - Get list of available Ollama models
 - POST /api/chat - Send chat message to Ollama (requires auth)
+
+## Frontend Setup
+Similar to backend, navigate to frontend using cd and then npm install, followed by npm run dev
