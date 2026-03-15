@@ -16,7 +16,8 @@
 - User registration with email and username validation
 - Login endpoint returning JWT tokens
 - Protected user info endpoint
-- Placeholder for password reset functionality
+- Password reset functionality with email verification
+- Secure token-based password reset with expiration
 
 ### REST API
 - Express.js server with CORS and JSON middleware
@@ -28,16 +29,28 @@
 
 ### Database
 - MongoDB integration using Mongoose ODM
-- User model with fields: username, email, password, createdAt
+- User model with fields: username, email, password, resetPasswordToken, resetPasswordExpires, createdAt
+- Chat model with fields: user, title, messages[], model, createdAt, updatedAt
+- Message sub-schema with fields: role, content, timestamp
 - Connection handling with environment variable configuration
-- Schema validation for user data
+- Schema validation for user and chat data
+
+### API Endpoints
 
 ### API Endpoints
 
 - POST /api/auth/register - Register a new user
 - POST /api/auth/login - Login user
 - GET /api/auth/user - Get user info (requires auth)
+- POST /api/auth/forgot-password - Request password reset email
+- POST /api/auth/reset-password/:token - Reset password with token
 - POST /api/auth/reset-password - Reset password (placeholder)
+- GET /api/chat - Get all user chats (requires auth)
+- GET /api/chat/:chatId - Get specific chat (requires auth)
+- POST /api/chat/new - Create new chat (requires auth)
+- POST /api/chat/:chatId - Send message in chat (requires auth)
+- PUT /api/chat/:chatId/title - Update chat title (requires auth)
+- DELETE /api/chat/:chatId - Delete chat (requires auth)
 - GET /api/chat/models - Get list of available Ollama models
 - POST /api/chat - Send chat message to Ollama (requires auth)
 

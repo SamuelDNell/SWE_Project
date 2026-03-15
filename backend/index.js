@@ -14,11 +14,14 @@ app.use(express.json());
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/chatbot')
 .then(() => console.log('MongoDB connected'))
-.catch(err => console.log(err));
+.catch(err => {
+    console.log('MongoDB connection error:', err);
+    process.exit(1);
+});
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/chat', require('./routes/chat'));
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
