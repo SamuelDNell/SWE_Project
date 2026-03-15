@@ -9,7 +9,7 @@ export default function Login() {
 
     const handleLogin = async () => {
         try {
-            const response = await fetch("http://localhost:5000/api/auth/login", {
+            const response = await fetch("http://localhost:3000/api/auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, password })
@@ -59,6 +59,16 @@ export default function Login() {
                 >
                     Log In
                 </button>
+
+                <div className={styles.forgotPassword}>
+                    <button
+                        className={styles.forgotBtn}
+                        onClick={() => navigate('/forgot-password')}
+                    >
+                        Forgot Password?
+                    </button>
+                </div>
+
                 <button
                     className={styles.backBtn}
                     onClick={() => navigate('/')}
