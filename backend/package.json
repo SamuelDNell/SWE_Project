@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jasmine"
   },
   "keywords": [],
   "author": "",
@@ -22,6 +22,9 @@
     "nodemailer": "^8.0.2"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "jasmine": "^6.1.0",
+    "jasmine-supertest": "^1.0.0",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.2.2"
   }
 }
