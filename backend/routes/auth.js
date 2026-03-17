@@ -3,8 +3,11 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const sgTransport = require('nodemailer-sendgrid-transport');
 const User = require('../models/User');
 const verifyToken = require('../middleware/auth');
+
+console.log('AUTH ROUTES LOADED');
 
 const router = express.Router();
 
@@ -80,16 +83,14 @@ router.post('/forgot-password', async (req, res) => {
     await user.save();
 
     // Send email
-    const transporter = nodemailer.createTransporter({
-      service: 'gmail',
+    const transporter = nodemailer.createTransport(sgTransport({
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        api_key: process.env.SENDGRID_API_KEY,
       },
-    });
+    }));
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: process.env.EMAIL_USER || 'noreply@knightly.com',
       to: email,
       subject: 'Password Reset - Knightly',
       html: `
@@ -105,7 +106,30 @@ router.post('/forgot-password', async (req, res) => {
     await transporter.sendMail(mailOptions);
     res.json({ msg: 'Password reset email sent' });
   } catch (err) {
-    console.error(err);
+    console.error('Email sending error:', err.message);
+    console.error('Full error:', err);
+    res.status(500).json({ msg: 'Server error', error: err.message });
+  }
+});
+
+// Development route: Generate test reset token
+router.get('/test-reset-token', async (req, res) => {
+  try {
+    const user = await User.findOne({ email: 'test@gmail.com' });
+    if (!user) return res.status(404).json({ msg: 'Test user not found' });
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    await user.save();
+
+    res.json({
+      msg: 'Test reset token generated',
+      resetLink: `http://localhost:5174/reset-password/${resetToken}`,
+      token: resetToken
+    });
+  } catch (err) {
     res.status(500).json({ msg: 'Server error' });
   }
 });
