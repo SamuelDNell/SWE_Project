@@ -20,8 +20,11 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/chatbot')
 });
 
 // Routes
+console.log('Loading auth routes...');
 app.use('/api/auth', require('./routes/auth'));
+console.log('Loading chat routes...');
 app.use('/api/chat', require('./routes/chat'));
+console.log('Routes loaded successfully');
 
 const PORT = process.env.PORT || 3000;
 
