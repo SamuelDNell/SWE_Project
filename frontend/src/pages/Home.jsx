@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import styles from './Home.module.css'
 
 export default function Home() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState("");
     const [chats, setChats] = useState([]);
@@ -18,6 +19,12 @@ export default function Home() {
         loadChats();
     }, []);
 
+    useEffect(() => {
+    if (location.state?.chatId) {
+        selectChat(location.state.chatId);
+    }
+}, [location.state]);
+    
     const loadChats = async () => {
         try {
             const token = localStorage.getItem("token");
