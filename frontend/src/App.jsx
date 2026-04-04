@@ -5,6 +5,7 @@ import SignUp from './pages/CreateAccount'
 import Home from './pages/Home'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
+import ChatHistory from './pages/ChatHistory'
 
 export default function App() {
   return (
