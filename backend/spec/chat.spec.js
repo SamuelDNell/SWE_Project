@@ -1,3 +1,7 @@
+process.env.NODE_ENV = 'test';
+process.env.JWT_SECRET = 'test_secret';
+process.env.MONGODB_URI = 'mongodb://localhost:27017/chatbot_test';
+
 const request = require('supertest');
 const mongoose = require('mongoose');
 const app = require('../index');
@@ -13,16 +17,18 @@ describe('Chat API', () => {
     process.env.NODE_ENV = 'test';
     process.env.JWT_SECRET = 'test_secret';
 
-    if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(
-        process.env.MONGODB_URI || 'mongodb://localhost:27017/chatbot_test'
-      );
+    console.log('TEST DB URI:', process.env.MONGODB_URI);
+    
+
+    if (mongoose.connection.readyState === 0) { //connecting to test database if not already connected
+      await mongoose.connect(process.env.MONGODB_URI); //every test seems to be wiping real local data?
     }
+    console.log('Connected DB name:', mongoose.connection.name);
   });
 
   afterAll(async () => {
-    await User.deleteMany({});
-    await Chat.deleteMany({});
+    await User.deleteMany({}); //clearing users
+    await Chat.deleteMany({}); //clearing chats
     await mongoose.connection.close();
   });
 
