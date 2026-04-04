@@ -29,7 +29,7 @@ const ChatSchema = new mongoose.Schema({
   messages: [MessageSchema],
   model: {
     type: String,
-    default: 'llama2'
+    default: "llama3.2:latest"
   },
   createdAt: {
     type: Date,
@@ -41,7 +41,7 @@ const ChatSchema = new mongoose.Schema({
   }
 });
 
-// Update the updatedAt field before saving
+// //Update the updatedAt field before saving
 // ChatSchema.pre('save', function(next) {
 //   this.updatedAt = Date.now();
 //   if (next) next();
