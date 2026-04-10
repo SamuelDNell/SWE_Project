@@ -4,13 +4,21 @@ import styles from './Home.module.css'
 
 export default function Home() {
     const navigate = useNavigate();
+const token = localStorage.getItem("token");
+
+useEffect(() => {
+  if (!token) {
+    navigate("/login");
+  }
+}, [token, navigate]);
+
     const location = useLocation();
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState("");
     const [chats, setChats] = useState([]);
     const [currentChatId, setCurrentChatId] = useState(null);
     const [showModal, setShowModal] = useState(false);
-    const [model, setModel] = useState("tinyllama:latest");
+    const [model, setModel] = useState("llama3.2:latest");
     const [loading, setLoading] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -38,8 +46,7 @@ export default function Home() {
                 const chatsData = await response.json();
                 setChats(chatsData);
 
-                // If no current chat is selected and we have chats, select the first one
-                if (!currentChatId && chatsData.length > 0) {
+                if (!currentChatId && !location.state?.chatId && chatsData.length > 0) {
                     selectChat(chatsData[0]._id);
                 }
             }
@@ -110,7 +117,7 @@ export default function Home() {
                     },
                     body: JSON.stringify({
                         title: input.length > 50 ? input.substring(0, 50) + "..." : input,
-                        model: "tinyllama:latest"
+                        model: "llama3.2:latest"
                     })
                 });
 
@@ -175,7 +182,7 @@ export default function Home() {
 
     const handleLogout = () => {
         localStorage.removeItem("token");
-        navigate('/');
+        navigate('/login');
     };
 
     const deleteChat = async (chatId, e) => {
@@ -234,7 +241,7 @@ export default function Home() {
                                 className={styles.deleteChat}
                                 onClick={(e) => deleteChat(chat._id, e)}
                             >
-                                ×
+                                
                             </button>
                         </div>
                     ))}
@@ -243,12 +250,19 @@ export default function Home() {
 
             {/* Main Chat Area */}
             <div className={styles.main}>
-                <div className={styles.header}>
-                    <h1>Knightly AI Assistant</h1>
-                    <button className={styles.logoutBtn} onClick={handleLogout}>
-                        Logout
-                    </button>
-                </div>
+            <div className={styles.header}>
+    <h1>Knightly AI Assistant</h1>
+
+    <div>
+        <button onClick={() => navigate('/history')}>
+            History
+        </button>
+
+        <button className={styles.logoutBtn} onClick={handleLogout}>
+            Logout
+        </button>
+    </div>
+</div>
 
                 <div className={styles.chatArea}>
                     {messages.length === 0 && currentChatId ? (
