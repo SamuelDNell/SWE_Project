@@ -83,6 +83,31 @@ async function runDemo() {
   await new Promise(r => setTimeout(r, 2000));
 
 
+  // Navigate to home/chat page after login
+await page.goto('http://localhost:5173/home');
+
+// Wait for chat input box
+await page.waitForSelector('textarea');
+
+// Type a message
+await page.type('textarea', 'Hello');
+
+// Click send button (adjust if needed)
+await page.keyboard.press('Enter');
+
+// Wait for response (LLM reply)
+await page.waitForTimeout(5000);
+
+// Check if response appeared
+const content = await page.content();
+
+if (!content.toLowerCase().includes('hello')) {
+  throw new Error('LLM response not detected');
+}
+
+console.log("LLM interaction test passed!");
+
+
   console.log("Demo complete!");
   await browser.close();
 }
