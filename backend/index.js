@@ -13,11 +13,11 @@ app.use(express.json());
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/chatbot')
-.then(() => console.log('MongoDB connected'))
-.catch(err => {
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => {
     console.log('MongoDB connection error:', err);
     process.exit(1);
-});
+  });
 
 // Routes
 console.log('Loading auth routes...');

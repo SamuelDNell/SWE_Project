@@ -1,9 +1,18 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import styles from './Home.module.css'
 
 export default function Home() {
     const navigate = useNavigate();
+const token = localStorage.getItem("token");
+
+useEffect(() => {
+  if (!token) {
+    navigate("/login");
+  }
+}, [token, navigate]);
+
+    const location = useLocation();
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState("");
     const [chats, setChats] = useState([]);
@@ -18,6 +27,12 @@ export default function Home() {
         loadChats();
     }, []);
 
+    useEffect(() => {
+    if (location.state?.chatId) {
+        selectChat(location.state.chatId);
+    }
+}, [location.state]);
+    
     const loadChats = async () => {
         try {
             const token = localStorage.getItem("token");
@@ -31,8 +46,7 @@ export default function Home() {
                 const chatsData = await response.json();
                 setChats(chatsData);
 
-                // If no current chat is selected and we have chats, select the first one
-                if (!currentChatId && chatsData.length > 0) {
+                if (!currentChatId && !location.state?.chatId && chatsData.length > 0) {
                     selectChat(chatsData[0]._id);
                 }
             }
@@ -168,7 +182,7 @@ export default function Home() {
 
     const handleLogout = () => {
         localStorage.removeItem("token");
-        navigate('/');
+        navigate('/login');
     };
 
     const deleteChat = async (chatId, e) => {
@@ -227,7 +241,7 @@ export default function Home() {
                                 className={styles.deleteChat}
                                 onClick={(e) => deleteChat(chat._id, e)}
                             >
-                                ×
+                                
                             </button>
                         </div>
                     ))}
@@ -236,12 +250,19 @@ export default function Home() {
 
             {/* Main Chat Area */}
             <div className={styles.main}>
-                <div className={styles.header}>
-                    <h1>Knightly AI Assistant</h1>
-                    <button className={styles.logoutBtn} onClick={handleLogout}>
-                        Logout
-                    </button>
-                </div>
+            <div className={styles.header}>
+    <h1>Knightly AI Assistant</h1>
+
+    <div>
+        <button onClick={() => navigate('/history')}>
+            History
+        </button>
+
+        <button className={styles.logoutBtn} onClick={handleLogout}>
+            Logout
+        </button>
+    </div>
+</div>
 
                 <div className={styles.chatArea}>
                     {messages.length === 0 && currentChatId ? (
