@@ -5,7 +5,7 @@ import SignUp from './pages/CreateAccount'
 import Home from './pages/Home'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
-import ChatHistory from './pages/ChatHistory'
+//import ChatHistory from './pages/ChatHistory'
 
 export default function App() {
   return (
@@ -17,8 +17,9 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/home" element={<Home />} />
-        <Route path="/history" element={<ChatHistory />} />
+        
       </Routes>
     </BrowserRouter>
   )
 }
+//<Route path="/history" element={<ChatHistory />} />
