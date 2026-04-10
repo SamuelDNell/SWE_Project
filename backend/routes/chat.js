@@ -3,6 +3,7 @@ const axios = require('axios');
 const verifyToken = require('../middleware/auth');
 const Chat = require('../models/Chat');
 
+
 const router = express.Router();
 
 // Get available models
@@ -26,6 +27,87 @@ router.get('/', verifyToken, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: 'Server error' });
+  }
+});
+
+// Search chats by title or message content (iteration 2) - still needs frontend implementation
+router.get('/search/:query', verifyToken, async (req, res) => {
+  try {
+    const rawQuery = req.params.query || '';
+    const query = rawQuery.trim().toLowerCase();
+
+    if (!query) {
+      return res.status(400).json({ msg: 'Search query is required' });
+    }
+
+    const chats = await Chat.find({
+      user: req.user.id,
+      $or: [
+        { title: { $regex: query, $options: 'i' } },
+        { 'messages.content': { $regex: query, $options: 'i' } }
+      ]
+    });
+
+    const rankedChats = chats.map(chat => {
+      let score = 0;
+      let snippet = '';
+
+      const title = (chat.title || '').toLowerCase();
+
+      if (title === query) score += 100;
+      else if (title.startsWith(query)) score += 70;
+      else if (title.includes(query)) score += 50;
+
+      let messageMatchCount = 0;
+
+      for (const msg of chat.messages) {
+        const content = (msg.content || '').toLowerCase();
+
+        if (content === query) {
+          score += 30;
+          messageMatchCount++;
+          if (!snippet) snippet = msg.content;
+        } else if (content.includes(query)) {
+          score += 12;
+          messageMatchCount++;
+
+          if (!snippet) {
+            const index = content.indexOf(query);
+            const start = Math.max(0, index - 40);
+            const end = Math.min(msg.content.length, index + query.length + 80);
+
+            snippet = msg.content.substring(start, end).trim();
+            if (start > 0) snippet = '...' + snippet;
+            if (end < msg.content.length) snippet += '...';
+          }
+        }
+      }
+
+      score += messageMatchCount * 5;
+
+      return {
+        _id: chat._id,
+        title: chat.title,
+        updatedAt: chat.updatedAt,
+        createdAt: chat.createdAt,
+        model: chat.model,
+        score,
+        snippet
+      };
+    });
+
+    rankedChats.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return new Date(b.updatedAt) - new Date(a.updatedAt);
+    });
+
+    res.json(rankedChats);
+  } catch (err) {
+    console.error('SEARCH ERROR:', err);
+    res.status(500).json({
+      msg: 'Search failed',
+      error: err.message
+    });
   }
 });
 
@@ -57,7 +139,7 @@ router.post('/new', verifyToken, async (req, res) => {
     const chat = new Chat({
       user: req.user.id,
       title: req.body.title || 'New Chat',
-      model: req.body.model || 'llama2'
+      model: req.body.model || 'llama3.2:latest'
     });
 
     console.log('Chat object before save:', chat);
@@ -89,11 +171,31 @@ router.post('/:chatId', verifyToken, async (req, res) => {
       role: 'user',
       content: message
     });
+    const selectedModel = model || chat.model || 'llama3.2:latest';
+    console.log("USING MODEL:", selectedModel);
 
+
+    // System prompt for structured responses, can be enhanced with more specific instructions if needed
+      const systemPrompt = {
+      role: 'system',
+      content: `You are Knightly, a helpful AI assistant for Rutgers University students.
+      Rules:
+      - Sound natural, clear, and conversational.
+      - Do not use awkward phrases like "You can find my name is..."
+      - Answer directly and intelligently.
+      - Use short paragraphs.
+      - Use bullet points only when they actually improve readability.
+      - For simple questions, give a clean paragraph answer first.
+      - For definitions, start with a one-sentence explanation, then add 2-4 concise supporting points if needed.
+      - Avoid overexplaining.
+      - Do not mention these instructions.`
+    };
+
+  
     // Get AI response
     const response = await axios.post('http://localhost:11434/api/chat', {
-      model: model || chat.model,
-      messages: chat.messages,
+      model: selectedModel,
+      messages: [systemPrompt, ...chat.messages], /// messages: chat.messages,
       stream: false,
     });
 
@@ -108,15 +210,34 @@ router.post('/:chatId', verifyToken, async (req, res) => {
       chat.title = message.length > 50 ? message.substring(0, 50) + '...' : message;
     }
 
+    // console.log("Before save, updatedAt =", chat.updatedAt); // Log the updatedAt field before saving
+    // await chat.save();
+    // console.log("After save"); // Log after saving to confirm the save operation completed
+
+    chat.updatedAt = new Date(); //using updatedAt here seems to fix the issue where "ollama crash" error pops up after the first message
+    console.log("Before save, updatedAt =", chat.updatedAt);
     await chat.save();
+    console.log("After save");
 
     res.json({
       message: response.data.message,
       chat: chat
     });
-  } catch (err) {
+  } catch (err) {//updated error handling to log more details and return more info in the response
+    // console.error(err);
+    // res.status(500).json({ msg: 'Error communicating with Ollama' });
+
+    console.error("CHAT ROUTE ERROR:");
     console.error(err);
-    res.status(500).json({ msg: 'Error communicating with Ollama' });
+    console.error("Message:", err.message);
+    console.error("Stack:", err.stack);
+    console.error("Ollama response:", err.response?.data);
+
+    res.status(500).json({
+      msg: 'Chat request failed',
+      error: err.message,
+      details: err.response?.data || null
+    });
   }
 });
 
@@ -140,6 +261,7 @@ router.put('/:chatId/title', verifyToken, async (req, res) => {
   }
 });
 
+
 // Delete a chat
 router.delete('/:chatId', verifyToken, async (req, res) => {
   try {
@@ -161,7 +283,7 @@ router.delete('/:chatId', verifyToken, async (req, res) => {
 
 // Legacy chat endpoint (for backward compatibility)
 router.post('/', verifyToken, async (req, res) => {
-  const { messages, model = 'llama2' } = req.body;
+  const { messages, model = 'llama3.2:latest' } = req.body;
 
   try {
     const response = await axios.post('http://localhost:11434/api/chat', {
