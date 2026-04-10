@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "jasmine"
+    "test": "jasmine",
+    "lint": "eslint ."
   },
   "keywords": [],
   "author": "",
@@ -23,6 +24,7 @@
     "nodemailer-sendgrid-transport": "^0.2.0"
   },
   "devDependencies": {
+    "eslint": "^9.39.4",
     "jasmine": "^6.1.0",
     "jasmine-supertest": "^1.0.0",
     "nodemon": "^3.1.14",
