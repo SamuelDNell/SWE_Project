@@ -18,7 +18,7 @@ useEffect(() => {
     const [chats, setChats] = useState([]);
     const [currentChatId, setCurrentChatId] = useState(null);
     const [showModal, setShowModal] = useState(false);
-    const [model, setModel] = useState("llama3.2:latest");
+    const [model, setModel] = useState("llama3.2:latest"); //updated default model to match backend
     const [loading, setLoading] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -117,7 +117,7 @@ useEffect(() => {
                     },
                     body: JSON.stringify({
                         title: input.length > 50 ? input.substring(0, 50) + "..." : input,
-                        model: "llama3.2:latest"
+                        model: "llama3.2:latest" //updated this to match backend default model
                     })
                 });
 
