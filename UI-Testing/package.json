@@ -1,7 +1,7 @@
 {
   "dependencies": {
-    "puppeteer": "^24.39.1",
-    "@cucumber/cucumber": "^12.7.0"
+    "@cucumber/cucumber": "^12.7.0",
+    "puppeteer": "^24.39.1"
   },
   "scripts": {
     "test": "cucumber-js"
