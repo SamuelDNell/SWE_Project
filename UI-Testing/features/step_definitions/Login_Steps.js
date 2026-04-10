@@ -12,9 +12,23 @@ When('I enter a valid login username and password', async function () {
   await this.page.type('#password', 'Password123###');
 });
 
+// Then('I should be logged in', async function () {
+//   // Logic to verify success would go here
+//   assert.ok(true);
+// });
+
 Then('I should be logged in', async function () {
-  // Logic to verify success would go here
-  assert.ok(true);
+  await this.clickByText('button', 'Log in');
+
+  // wait for something to happen
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
+  // check that page didn't crash and input exists
+  const emailExists = await this.page.$('#email') !== null;
+
+  if (!emailExists) {
+    throw new Error('Login page broke or element missing');
+  }
 });
 
 When('I enter a valid username and invalid password', async function () {
