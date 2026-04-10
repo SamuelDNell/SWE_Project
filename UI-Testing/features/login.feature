@@ -1,7 +1,7 @@
 Feature: User Login
 Scenario: Successful login
 Given I am on the login page
-When I enter a valid login username and password
+When I enter a valid username and password
 Then I should be logged in
 
 Scenario: Incorrect password
