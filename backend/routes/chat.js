@@ -21,8 +21,8 @@ router.get('/models', async (req, res) => {
 router.get('/', verifyToken, async (req, res) => {
   try {
     const chats = await Chat.find({ user: req.user.id })
-      .sort({ updatedAt: -1 })
-      .select('title updatedAt messages model');
+      .sort({ createdAt: -1 })
+      .select('title createdAt updatedAt messages model models');
     res.json(chats);
   } catch (err) {
     console.error(err);
@@ -92,7 +92,8 @@ router.get('/search/:query', verifyToken, async (req, res) => {
         createdAt: chat.createdAt,
         model: chat.model,
         score,
-        snippet
+        snippet,
+        messageCount: chat.messages.length
       };
     });
 
@@ -136,10 +137,16 @@ router.post('/new', verifyToken, async (req, res) => {
     console.log('Creating new chat for user:', req.user.id);
     console.log('Request body:', req.body);
 
+    const selectedModel = req.body.model || 'llama3.2:latest';
+    const selectedModels = Array.isArray(req.body.models) && req.body.models.length
+      ? req.body.models
+      : [selectedModel];
+
     const chat = new Chat({
       user: req.user.id,
       title: req.body.title || 'New Chat',
-      model: req.body.model || 'llama3.2:latest'
+      model: selectedModel,
+      models: selectedModels
     });
 
     console.log('Chat object before save:', chat);
@@ -154,7 +161,7 @@ router.post('/new', verifyToken, async (req, res) => {
 
 // Send message in a chat
 router.post('/:chatId', verifyToken, async (req, res) => {
-  const { message, model } = req.body;
+  const { message, models } = req.body;
 
   try {
     let chat = await Chat.findOne({
@@ -171,12 +178,14 @@ router.post('/:chatId', verifyToken, async (req, res) => {
       role: 'user',
       content: message
     });
-    const selectedModel = model || chat.model || 'llama3.2:latest';
-    console.log("USING MODEL:", selectedModel);
 
+    const selectedModels = Array.isArray(models) && models.length
+      ? models
+      : (chat.models && chat.models.length ? chat.models : [chat.model || 'llama3.2:latest']);
 
-    // System prompt for structured responses, can be enhanced with more specific instructions if needed
-      const systemPrompt = {
+    console.log('USING MODELS:', selectedModels);
+
+    const systemPrompt = {
       role: 'system',
       content: `You are Knightly, a helpful AI assistant for Rutgers University students.
       Rules:
@@ -191,53 +200,108 @@ router.post('/:chatId', verifyToken, async (req, res) => {
       - Do not mention these instructions.`
     };
 
-  
-    // Get AI response
-    const response = await axios.post('http://localhost:11434/api/chat', {
-      model: selectedModel,
-      messages: [systemPrompt, ...chat.messages], /// messages: chat.messages,
-      stream: false,
+    const responses = await Promise.all(selectedModels.map((selectedModel) =>
+      axios.post('http://localhost:11434/api/chat', {
+        model: selectedModel,
+        messages: [systemPrompt, ...chat.messages],
+        stream: false,
+      })
+    ));
+
+    responses.forEach((response, index) => {
+      chat.messages.push({
+        role: 'assistant',
+        content: response.data.message.content,
+        model: selectedModels[index]
+      });
     });
 
-    // Add AI response to chat
-    chat.messages.push({
-      role: 'assistant',
-      content: response.data.message.content
-    });
+    chat.models = selectedModels;
 
-    // Update chat title if it's the first message
-    if (chat.messages.length === 2 && chat.title === 'New Chat') {
+    if (chat.messages.length === responses.length + 1 && chat.title === 'New Chat') {
       chat.title = message.length > 50 ? message.substring(0, 50) + '...' : message;
     }
 
-    // console.log("Before save, updatedAt =", chat.updatedAt); // Log the updatedAt field before saving
-    // await chat.save();
-    // console.log("After save"); // Log after saving to confirm the save operation completed
-
-    chat.updatedAt = new Date(); //using updatedAt here seems to fix the issue where "ollama crash" error pops up after the first message
-    console.log("Before save, updatedAt =", chat.updatedAt);
+    chat.updatedAt = new Date();
+    console.log('Before save, updatedAt =', chat.updatedAt);
     await chat.save();
-    console.log("After save");
+    console.log('After save');
 
     res.json({
-      message: response.data.message,
+      responses: responses.map((response, index) => ({
+        model: selectedModels[index],
+        content: response.data.message.content
+      })),
       chat: chat
     });
-  } catch (err) {//updated error handling to log more details and return more info in the response
-    // console.error(err);
-    // res.status(500).json({ msg: 'Error communicating with Ollama' });
-
-    console.error("CHAT ROUTE ERROR:");
+  } catch (err) {
+    console.error('CHAT ROUTE ERROR:');
     console.error(err);
-    console.error("Message:", err.message);
-    console.error("Stack:", err.stack);
-    console.error("Ollama response:", err.response?.data);
+    console.error('Message:', err.message);
+    console.error('Stack:', err.stack);
+    console.error('Ollama response:', err.response?.data);
 
     res.status(500).json({
       msg: 'Chat request failed',
       error: err.message,
       details: err.response?.data || null
     });
+  }
+});
+
+// Keep only one model output for the latest user turn
+router.put('/:chatId/select-output', verifyToken, async (req, res) => {
+  try {
+    const { model } = req.body;
+    if (!model) {
+      return res.status(400).json({ msg: 'Model is required' });
+    }
+
+    const chat = await Chat.findOne({
+      _id: req.params.chatId,
+      user: req.user.id
+    });
+
+    if (!chat) {
+      return res.status(404).json({ msg: 'Chat not found' });
+    }
+
+    const lastUserIndex = chat.messages
+      .map((message, index) => (message.role === 'user' ? index : -1))
+      .filter(index => index !== -1)
+      .pop();
+
+    if (lastUserIndex === undefined || lastUserIndex === -1) {
+      return res.status(400).json({ msg: 'No user message found to select output for' });
+    }
+
+    const previousMessages = chat.messages.slice(0, lastUserIndex + 1);
+    const assistantResponses = chat.messages.slice(lastUserIndex + 1);
+    const hasModelResponse = assistantResponses.some(
+      (message) => message.role === 'assistant' && message.model === model
+    );
+
+    if (!hasModelResponse) {
+      return res.status(400).json({ msg: 'Selected model response not found' });
+    }
+
+    const filteredMessages = [
+      ...previousMessages,
+      ...assistantResponses.filter(
+        (message) => message.role !== 'assistant' || message.model === model
+      )
+    ];
+
+    chat.messages = filteredMessages;
+    chat.model = model;
+    chat.models = [model];
+    chat.updatedAt = new Date();
+
+    await chat.save();
+    res.json(chat);
+  } catch (err) {
+    console.error('Error selecting output:', err);
+    res.status(500).json({ msg: 'Server error', error: err.message });
   }
 });
 

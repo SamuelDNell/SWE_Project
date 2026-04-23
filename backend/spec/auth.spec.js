@@ -9,8 +9,13 @@ describe('Authentication API', () => {
     process.env.NODE_ENV = 'test';
     process.env.JWT_SECRET = 'test_secret';
 
+    // Disconnect from production DB if already connected
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.disconnect();
+    }
+
     // Connect to test database
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/chatbot_test');
+    await mongoose.connect('mongodb://localhost:27017/chatbot_test');
   });
 
   afterAll(async () => {
