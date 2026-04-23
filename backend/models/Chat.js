@@ -10,6 +10,10 @@ const MessageSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  model: {
+    type: String,
+    default: null
+  },
   timestamp: {
     type: Date,
     default: Date.now
@@ -30,6 +34,10 @@ const ChatSchema = new mongoose.Schema({
   model: {
     type: String,
     default: "llama3.2:latest"
+  },
+  models: {
+    type: [String],
+    default: ["llama3.2:latest"]
   },
   createdAt: {
     type: Date,

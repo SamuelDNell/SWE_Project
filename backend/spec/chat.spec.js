@@ -19,10 +19,13 @@ describe('Chat API', () => {
 
     console.log('TEST DB URI:', process.env.MONGODB_URI);
     
-
-    if (mongoose.connection.readyState === 0) { //connecting to test database if not already connected
-      await mongoose.connect(process.env.MONGODB_URI); //every test seems to be wiping real local data?
+    // Disconnect from production DB if already connected
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.disconnect();
     }
+
+    // Connect to test database
+    await mongoose.connect(process.env.MONGODB_URI);
     console.log('Connected DB name:', mongoose.connection.name);
   });
 
@@ -183,6 +186,97 @@ describe('Chat API', () => {
       expect(response.body.chat.messages.length).toBe(2);
       expect(response.body.chat.messages[0].content).toBe('Hello');
       expect(response.body.chat.messages[1].content).toBe('This is a mocked LLM response.');
+      expect(response.body.chat.messages[1].model).toBe('llama3.2:latest');
+    });
+
+    it('should store assistant responses for multiple selected models', async () => {
+      const chat = await Chat.create({
+        user: userId,
+        title: 'Multi Model Chat',
+        model: 'llama3.2:latest',
+        messages: []
+      });
+
+      let callCount = 0;
+      spyOn(axios, 'post').and.callFake(() => {
+        callCount += 1;
+        return Promise.resolve({
+          data: {
+            message: {
+              content: `Mocked response ${callCount}`
+            }
+          }
+        });
+      });
+
+      const selectedModels = ['llama3.2:latest', 'llama3.1:latest'];
+      const response = await request(app)
+        .post(`/api/chat/${chat._id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          message: 'Compare models',
+          models: selectedModels
+        })
+        .expect(200);
+
+      expect(response.body.chat).toBeDefined();
+      expect(response.body.chat.messages.length).toBe(3);
+      expect(response.body.chat.messages[1].model).toBe('llama3.2:latest');
+      expect(response.body.chat.messages[2].model).toBe('llama3.1:latest');
+      expect(response.body.chat.models).toEqual(selectedModels);
+      expect(response.body.responses.length).toBe(2);
+      expect(response.body.responses[0].model).toBe('llama3.2:latest');
+      expect(response.body.responses[1].model).toBe('llama3.1:latest');
+    });
+  });
+
+  describe('PUT /api/chat/:chatId/select-output', () => {
+    it('should keep only the selected model output for the latest user message', async () => {
+      const chat = await Chat.create({
+        user: userId,
+        title: 'Choice Chat',
+        model: 'llama3.2:latest',
+        models: ['llama3.2:latest', 'llama3.1:latest'],
+        messages: [
+          { role: 'user', content: 'Choose one response' },
+          { role: 'assistant', content: 'Response from llama3.2', model: 'llama3.2:latest' },
+          { role: 'assistant', content: 'Response from llama3.1', model: 'llama3.1:latest' }
+        ]
+      });
+
+      const response = await request(app)
+        .put(`/api/chat/${chat._id}/select-output`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ model: 'llama3.1:latest' })
+        .expect(200);
+
+      expect(response.body.messages.length).toBe(2);
+      expect(response.body.messages[1].role).toBe('assistant');
+      expect(response.body.messages[1].model).toBe('llama3.1:latest');
+      expect(response.body.messages[1].content).toBe('Response from llama3.1');
+      expect(response.body.model).toBe('llama3.1:latest');
+      expect(response.body.models).toEqual(['llama3.1:latest']);
+    });
+
+    it('should return 400 when selecting an unavailable model output', async () => {
+      const chat = await Chat.create({
+        user: userId,
+        title: 'Choice Chat',
+        model: 'llama3.2:latest',
+        models: ['llama3.2:latest'],
+        messages: [
+          { role: 'user', content: 'Choose one response' },
+          { role: 'assistant', content: 'Response from llama3.2', model: 'llama3.2:latest' }
+        ]
+      });
+
+      const response = await request(app)
+        .put(`/api/chat/${chat._id}/select-output`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ model: 'llama3.1:latest' })
+        .expect(400);
+
+      expect(response.body.msg).toBe('Selected model response not found');
     });
   });
 });
