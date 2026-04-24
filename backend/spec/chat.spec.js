@@ -39,7 +39,7 @@ describe('Chat API', () => {
     const userData = {
       username: 'testuser',
       email: 'test@example.com',
-      password: 'password123'
+      password: 'Password123'
     };
 
     const registerResponse = await request(app)

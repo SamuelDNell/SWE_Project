@@ -50,8 +50,8 @@ describe('User Interface Components', () => {
 
     it('should validate password confirmation', () => {
       // Test password matching logic
-      const password = 'password123';
-      const confirmPassword = 'password123';
+      const password = 'Password123';
+      const confirmPassword = 'Password123';
       const wrongConfirm = 'differentpassword';
 
       expect(password === confirmPassword).toBe(true);

@@ -29,7 +29,7 @@ describe('Authentication API', () => {
       const userData = {
         username: 'testuser',
         email: 'test@example.com',
-        password: 'password123'
+        password: 'Password123'
       };
 
       const response = await request(app)
@@ -47,7 +47,7 @@ describe('Authentication API', () => {
       const userData = {
         username: 'testuser',
         email: 'test@example.com',
-        password: 'password123'
+        password: 'Password123'
       };
 
       await request(app)
@@ -84,7 +84,7 @@ describe('Authentication API', () => {
       const userData = {
         username: 'testuser',
         email: 'test@example.com',
-        password: 'password123'
+        password: 'Password123'
       };
 
       await request(app)
@@ -95,7 +95,7 @@ describe('Authentication API', () => {
     it('should login user with correct credentials', async () => {
       const loginData = {
         email: 'test@example.com',
-        password: 'password123'
+        password: 'Password123'
       };
 
       const response = await request(app)
@@ -125,7 +125,7 @@ describe('Authentication API', () => {
     it('should not login with non-existent email', async () => {
       const loginData = {
         email: 'nonexistent@example.com',
-        password: 'password123'
+        password: 'Password123'
       };
 
       const response = await request(app)
@@ -145,7 +145,7 @@ describe('Authentication API', () => {
       const userData = {
         username: 'testuser',
         email: 'test@example.com',
-        password: 'password123'
+        password: 'Password123'
       };
 
       const registerResponse = await request(app)

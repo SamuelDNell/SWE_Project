@@ -231,6 +231,8 @@
 
 .message.assistant {
     justify-content: flex-start;
+    flex-direction: column;
+    align-items: flex-start;
 }
 
 .messageContent {
@@ -255,11 +257,34 @@
     border-bottom-left-radius: 4px;
 }
 
+.messageModel {
+    font-size: 11px;
+    font-weight: 600;
+    color: #378ADD;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
 /* Input Area */
 .inputArea {
     padding: 1rem 1.5rem;
     border-top: 1px solid GrayText;
     background-color: Canvas;
+}
+
+.compareToggle {
+    max-width: 800px;
+    margin: 0 auto 0.5rem auto;
+    font-size: 14px;
+    color: GrayText;
+}
+
+.compareToggle label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
 }
 
 .inputContainer {
@@ -268,6 +293,101 @@
     display: flex;
     gap: 0.75rem;
     align-items: center;
+}
+
+.sendControls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.modelSelect {
+    height: 48px;
+    padding: 0 0.75rem;
+    border: 1.5px solid GrayText;
+    border-radius: 12px;
+    background-color: Canvas;
+    color: CanvasText;
+    font-size: 14px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+.modelSelect:focus {
+    border-color: #378ADD;
+}
+
+.optionsContainer {
+    margin: 1.5rem 0;
+    padding: 1.5rem;
+    background-color: rgba(55, 138, 221, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(55, 138, 221, 0.2);
+    width: 100%;
+}
+
+.optionsContainer h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 16px;
+    font-weight: 600;
+    color: CanvasText;
+}
+
+.optionsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+}
+
+.optionCard {
+    background-color: Canvas;
+    border: 1px solid GrayText;
+    border-radius: 12px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.optionHeader {
+    font-size: 12px;
+    font-weight: 700;
+    color: #378ADD;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.optionContent {
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.5;
+    color: CanvasText;
+    white-space: pre-wrap;
+}
+
+.selectBtn {
+    width: 100%;
+    padding: 0.75rem;
+    background: #378ADD;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.selectBtn:hover:not(:disabled) {
+    background: #2c6bc7;
+}
+
+.selectBtn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
 }
 
 .input {

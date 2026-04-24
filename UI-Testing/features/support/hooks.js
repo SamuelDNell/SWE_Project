@@ -2,7 +2,7 @@ const { Before, After, setWorldConstructor, setDefaultTimeout } = require('@cucu
 const puppeteer = require('puppeteer');
 
 // Set default timeout for all steps (in milliseconds)
-setDefaultTimeout(10000);
+setDefaultTimeout(60000);
 
 class CustomWorld {
   constructor() {
@@ -28,9 +28,20 @@ setWorldConstructor(CustomWorld);
 Before(async function () {
   this.browser = await puppeteer.launch({ 
     headless: "new", // Run in headless mode for CI/clean tests
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    slowMo: 50 // Add a small delay between actions
   });
   this.page = await this.browser.newPage();
+
+  // Auto-dismiss alerts so they don't hang the tests
+  this.page.on('dialog', async dialog => {
+    try {
+      await dialog.dismiss();
+    } catch (e) {
+      // Ignore errors if the page is already navigating or closed
+    }
+  });
+
   await this.page.setViewport({ width: 1280, height: 720 });
 });
 

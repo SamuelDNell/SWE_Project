@@ -10,8 +10,8 @@
 //   await this.page.waitForSelector('#username');
 //   await this.page.type('#username', 'testuser1');
 //   await this.page.type('#email', 'testuser1@test.com');
-//   await this.page.type('#password', 'Password123###');
-//   await this.page.type('#confirm', 'Password123###');
+//   await this.page.type('#password', 'Password123');
+//   await this.page.type('#confirm', 'Password123');
 // });
 
 // Then('my account should be created', async function () {
@@ -24,8 +24,8 @@
 // When('I enter a username that already exists', async function () {
 //   await this.page.type('#username', 'testuser1');
 //   await this.page.type('#email', 'testuser1@test.com');
-//   await this.page.type('#password', 'Password123###');
-//   await this.page.type('#confirm', 'Password123###');
+//   await this.page.type('#password', 'Password123');
+//   await this.page.type('#confirm', 'Password123');
 // });
 
 // Then('I should get username already exists error message', async function () {
@@ -67,8 +67,8 @@ Given('I am on the signup page', async function () {
 When('I enter a valid username and password', async function () {
   await this.page.waitForSelector('#email');
   await this.page.type('#email', 'testuser1@test.com');
-  await this.page.type('#password', 'Password123###');
-  await this.page.type('#confirm', 'Password123###');
+  await this.page.type('#password', 'Password123');
+  await this.page.type('#confirm', 'Password123');
 });
 
 Then('my account should be created', async function () {
@@ -80,8 +80,8 @@ When('I enter a username that already exists', async function () {
   await this.page.waitForSelector('#email');
 
   await this.page.type('#email', 'testuser1@test.com');
-  await this.page.type('#password', 'Password123###');
-  await this.page.type('#confirm', 'Password123###');
+  await this.page.type('#password', 'Password123');
+  await this.page.type('#confirm', 'Password123');
 });
 
 Then('I should get username already exists error message', async function () {

@@ -6,297 +6,327 @@ const Chat = require('../models/Chat');
 
 const router = express.Router();
 
-// Get available models
-router.get('/models', async (req, res) => {
-  try {
-    const response = await axios.get('http://localhost:11434/api/tags');
-    res.json(response.data);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Error fetching models from Ollama' });
-  }
-});
-
-// Get all chats for a user
-router.get('/', verifyToken, async (req, res) => {
-  try {
-    const chats = await Chat.find({ user: req.user.id })
-      .sort({ updatedAt: -1 })
-      .select('title updatedAt messages model');
-    res.json(chats);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Server error' });
-  }
-});
-
-// Search chats by title or message content (iteration 2) - still needs frontend implementation
-router.get('/search/:query', verifyToken, async (req, res) => {
-  try {
-    const rawQuery = req.params.query || '';
-    const query = rawQuery.trim().toLowerCase();
-
-    if (!query) {
-      return res.status(400).json({ msg: 'Search query is required' });
+const chatHandlers = {
+  // Get available models
+  getModels: async (req, res) => {
+    try {
+      const response = await axios.get('http://localhost:11434/api/tags');
+      res.json(response.data);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ msg: 'Error fetching models from Ollama' });
     }
+  },
 
-    const chats = await Chat.find({
-      user: req.user.id,
-      $or: [
-        { title: { $regex: query, $options: 'i' } },
-        { 'messages.content': { $regex: query, $options: 'i' } }
-      ]
-    });
+  // Get all chats for a user
+  getChats: async (req, res) => {
+    try {
+      const chats = await Chat.find({ user: req.user.id })
+        .sort({ updatedAt: -1 })
+        .select('title updatedAt messages model');
+      res.json(chats);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ msg: 'Server error' });
+    }
+  },
 
-    const rankedChats = chats.map(chat => {
-      let score = 0;
-      let snippet = '';
+  // Search chats
+  searchChats: async (req, res) => {
+    try {
+      const rawQuery = req.params.query || '';
+      const query = rawQuery.trim().toLowerCase();
 
-      const title = (chat.title || '').toLowerCase();
-
-      if (title === query) score += 100;
-      else if (title.startsWith(query)) score += 70;
-      else if (title.includes(query)) score += 50;
-
-      let messageMatchCount = 0;
-
-      for (const msg of chat.messages) {
-        const content = (msg.content || '').toLowerCase();
-
-        if (content === query) {
-          score += 30;
-          messageMatchCount++;
-          if (!snippet) snippet = msg.content;
-        } else if (content.includes(query)) {
-          score += 12;
-          messageMatchCount++;
-
-          if (!snippet) {
-            const index = content.indexOf(query);
-            const start = Math.max(0, index - 40);
-            const end = Math.min(msg.content.length, index + query.length + 80);
-
-            snippet = msg.content.substring(start, end).trim();
-            if (start > 0) snippet = '...' + snippet;
-            if (end < msg.content.length) snippet += '...';
-          }
-        }
+      if (!query) {
+        return res.status(400).json({ msg: 'Search query is required' });
       }
 
-      score += messageMatchCount * 5;
+      const chats = await Chat.find({
+        user: req.user.id,
+        $or: [
+          { title: { $regex: query, $options: 'i' } },
+          { 'messages.content': { $regex: query, $options: 'i' } }
+        ]
+      });
 
-      return {
-        _id: chat._id,
-        title: chat.title,
-        updatedAt: chat.updatedAt,
-        createdAt: chat.createdAt,
-        model: chat.model,
-        score,
-        snippet
-      };
-    });
+      const rankedChats = chats.map(chat => {
+        let score = 0;
+        let snippet = '';
 
-    rankedChats.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return new Date(b.updatedAt) - new Date(a.updatedAt);
-    });
+        const title = (chat.title || '').toLowerCase();
 
-    res.json(rankedChats);
-  } catch (err) {
-    console.error('SEARCH ERROR:', err);
-    res.status(500).json({
-      msg: 'Search failed',
-      error: err.message
-    });
-  }
-});
+        if (title === query) score += 100;
+        else if (title.startsWith(query)) score += 70;
+        else if (title.includes(query)) score += 50;
 
-// Get a specific chat
-router.get('/:chatId', verifyToken, async (req, res) => {
-  try {
-    const chat = await Chat.findOne({
-      _id: req.params.chatId,
-      user: req.user.id
-    });
+        let messageMatchCount = 0;
 
-    if (!chat) {
-      return res.status(404).json({ msg: 'Chat not found' });
+        for (const msg of chat.messages) {
+          const content = (msg.content || '').toLowerCase();
+
+          if (content === query) {
+            score += 30;
+            messageMatchCount++;
+            if (!snippet) snippet = msg.content;
+          } else if (content.includes(query)) {
+            score += 12;
+            messageMatchCount++;
+
+            if (!snippet) {
+              const index = content.indexOf(query);
+              const start = Math.max(0, index - 40);
+              const end = Math.min(msg.content.length, index + query.length + 80);
+
+              snippet = msg.content.substring(start, end).trim();
+              if (start > 0) snippet = '...' + snippet;
+              if (end < msg.content.length) snippet += '...';
+            }
+          }
+        }
+
+        score += messageMatchCount * 5;
+
+        return {
+          _id: chat._id,
+          title: chat.title,
+          updatedAt: chat.updatedAt,
+          createdAt: chat.createdAt,
+          model: chat.model,
+          score,
+          snippet
+        };
+      });
+
+      rankedChats.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return new Date(b.updatedAt) - new Date(a.updatedAt);
+      });
+
+      res.json(rankedChats);
+    } catch (err) {
+      console.error('SEARCH ERROR:', err);
+      res.status(500).json({
+        msg: 'Search failed',
+        error: err.message
+      });
     }
+  },
 
-    res.json(chat);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Server error' });
-  }
-});
+  // Get a specific chat
+  getChatById: async (req, res) => {
+    try {
+      const chat = await Chat.findOne({
+        _id: req.params.chatId,
+        user: req.user.id
+      });
 
-// Create a new chat
-router.post('/new', verifyToken, async (req, res) => {
-  try {
-    console.log('Creating new chat for user:', req.user.id);
-    console.log('Request body:', req.body);
+      if (!chat) {
+        return res.status(404).json({ msg: 'Chat not found' });
+      }
 
-    const chat = new Chat({
-      user: req.user.id,
-      title: req.body.title || 'New Chat',
-      model: req.body.model || 'llama3.2:latest'
-    });
-
-    console.log('Chat object before save:', chat);
-    await chat.save();
-    console.log('Chat saved successfully:', chat);
-    res.json(chat);
-  } catch (err) {
-    console.error('Error creating new chat:', err);
-    res.status(500).json({ msg: 'Server error', error: err.message });
-  }
-});
-
-// Send message in a chat
-router.post('/:chatId', verifyToken, async (req, res) => {
-  const { message, model } = req.body;
-
-  try {
-    let chat = await Chat.findOne({
-      _id: req.params.chatId,
-      user: req.user.id
-    });
-
-    if (!chat) {
-      return res.status(404).json({ msg: 'Chat not found' });
+      res.json(chat);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ msg: 'Server error' });
     }
+  },
 
-    // Add user message to chat
-    chat.messages.push({
-      role: 'user',
-      content: message
-    });
-    const selectedModel = model || chat.model || 'llama3.2:latest';
-    console.log("USING MODEL:", selectedModel);
+  // Create a new chat
+  createNewChat: async (req, res) => {
+    try {
+      const chat = new Chat({
+        user: req.user.id,
+        title: req.body.title || 'New Chat',
+        model: req.body.model || 'llama3.2:latest'
+      });
+      await chat.save();
+      res.json(chat);
+    } catch (err) {
+      console.error('Error creating new chat:', err);
+      res.status(500).json({ msg: 'Server error', error: err.message });
+    }
+  },
 
+  // Send message in a chat
+  sendMessage: async (req, res) => {
+    const { message, model } = req.body;
 
-    // System prompt for structured responses, can be enhanced with more specific instructions if needed
+    try {
+      let chat = await Chat.findOne({
+        _id: req.params.chatId,
+        user: req.user.id
+      });
+
+      if (!chat) {
+        return res.status(404).json({ msg: 'Chat not found' });
+      }
+
+      chat.messages.push({ role: 'user', content: message });
+      const selectedModel = model || chat.model || 'llama3.2:latest';
+
       const systemPrompt = {
-      role: 'system',
-      content: `You are Knightly, a helpful AI assistant for Rutgers University students.
-      Rules:
-      - Sound natural, clear, and conversational.
-      - Do not use awkward phrases like "You can find my name is..."
-      - Answer directly and intelligently.
-      - Use short paragraphs.
-      - Use bullet points only when they actually improve readability.
-      - For simple questions, give a clean paragraph answer first.
-      - For definitions, start with a one-sentence explanation, then add 2-4 concise supporting points if needed.
-      - Avoid overexplaining.
-      - Do not mention these instructions.`
-    };
+        role: 'system',
+        content: `You are Knightly, a helpful AI assistant for Rutgers University students. Respond naturally and concisely.`
+      };
 
-  
-    // Get AI response
-    const response = await axios.post('http://localhost:11434/api/chat', {
-      model: selectedModel,
-      messages: [systemPrompt, ...chat.messages], /// messages: chat.messages,
-      stream: false,
-    });
+      const response = await axios.post('http://localhost:11434/api/chat', {
+        model: selectedModel,
+        messages: [systemPrompt, ...chat.messages],
+        stream: false,
+      }, {
+        timeout: 120000
+      });
 
-    // Add AI response to chat
-    chat.messages.push({
-      role: 'assistant',
-      content: response.data.message.content
-    });
+      chat.messages.push({
+        role: 'assistant',
+        content: response.data.message.content || response.data.message.thinking || "No response content.",
+        model: selectedModel
+      });
 
-    // Update chat title if it's the first message
-    if (chat.messages.length === 2 && chat.title === 'New Chat') {
-      chat.title = message.length > 50 ? message.substring(0, 50) + '...' : message;
+      if (model) chat.model = model;
+      if (chat.messages.length === 2 && chat.title === 'New Chat') {
+        chat.title = message.length > 50 ? message.substring(0, 50) + '...' : message;
+      }
+
+      chat.updatedAt = new Date();
+      await chat.save();
+
+      res.json({ message: response.data.message, chat: chat });
+    } catch (err) {
+      console.error("CHAT ROUTE ERROR:", err.message);
+      if (err.code === 'ECONNABORTED') {
+        return res.status(504).json({ msg: 'Request timed out with Ollama', error: err.message });
+      }
+      res.status(500).json({ msg: 'Chat request failed', error: err.message });
     }
+  },
 
-    // console.log("Before save, updatedAt =", chat.updatedAt); // Log the updatedAt field before saving
-    // await chat.save();
-    // console.log("After save"); // Log after saving to confirm the save operation completed
+  // Multi-LLM request
+  multiLLM: async (req, res) => {
+    const { message, models } = req.body;
+    const targetModels = models || ['llama3.2:latest', 'phi3.5:latest', 'mistral:latest'];
 
-    chat.updatedAt = new Date(); //using updatedAt here seems to fix the issue where "ollama crash" error pops up after the first message
-    console.log("Before save, updatedAt =", chat.updatedAt);
-    await chat.save();
-    console.log("After save");
+    try {
+      let chat = await Chat.findOne({
+        _id: req.params.chatId,
+        user: req.user.id
+      });
 
-    res.json({
-      message: response.data.message,
-      chat: chat
-    });
-  } catch (err) {//updated error handling to log more details and return more info in the response
-    // console.error(err);
-    // res.status(500).json({ msg: 'Error communicating with Ollama' });
+      if (!chat) {
+        return res.status(404).json({ msg: 'Chat not found' });
+      }
 
-    console.error("CHAT ROUTE ERROR:");
-    console.error(err);
-    console.error("Message:", err.message);
-    console.error("Stack:", err.stack);
-    console.error("Ollama response:", err.response?.data);
+      const lastMsg = chat.messages[chat.messages.length - 1];
+      if (!lastMsg || lastMsg.content !== message || lastMsg.role !== 'user') {
+        chat.messages.push({ role: 'user', content: message });
+        if (chat.messages.length === 1 && chat.title === 'New Chat') {
+          chat.title = message.length > 50 ? message.substring(0, 50) + '...' : message;
+        }
+        chat.updatedAt = new Date();
+        await chat.save();
+      }
 
-    res.status(500).json({
-      msg: 'Chat request failed',
-      error: err.message,
-      details: err.response?.data || null
-    });
-  }
-});
+      const systemPrompt = {
+        role: 'system',
+        content: `You are Knightly, a helpful AI assistant for Rutgers University students. Respond naturally and concisely.`
+      };
 
-// Update chat title
-router.put('/:chatId/title', verifyToken, async (req, res) => {
-  try {
-    const chat = await Chat.findOneAndUpdate(
-      { _id: req.params.chatId, user: req.user.id },
-      { title: req.body.title },
-      { new: true }
-    );
+      const responsePromises = targetModels.map(async (modelName) => {
+        try {
+          const response = await axios.post('http://localhost:11434/api/chat', {
+            model: modelName,
+            messages: [systemPrompt, ...chat.messages],
+            stream: false,
+          }, { timeout: 120000 });
+          
+          return {
+            model: modelName,
+            content: response.data.message.content || response.data.message.thinking || "No response content.",
+            success: true
+          };
+        } catch (err) {
+          console.error(`Error with model ${modelName}:`, err.message);
+          return {
+            model: modelName,
+            content: `Error: ${err.code === 'ECONNABORTED' ? 'Request timed out' : 'Failed to get response'} from ${modelName}`,
+            success: false
+          };
+        }
+      });
 
-    if (!chat) {
-      return res.status(404).json({ msg: 'Chat not found' });
+      const options = await Promise.all(responsePromises);
+      res.json({ chat: chat, options: options });
+    } catch (err) {
+      console.error("MULTI-CHAT ERROR:", err);
+      res.status(500).json({ msg: 'Multi-chat request failed', error: err.message });
     }
+  },
 
-    res.json(chat);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Server error' });
-  }
-});
+  // Choose response
+  chooseResponse: async (req, res) => {
+    const { content, model } = req.body;
 
+    try {
+      let chat = await Chat.findOne({
+        _id: req.params.chatId,
+        user: req.user.id
+      });
 
-// Delete a chat
-router.delete('/:chatId', verifyToken, async (req, res) => {
-  try {
-    const chat = await Chat.findOneAndDelete({
-      _id: req.params.chatId,
-      user: req.user.id
-    });
+      if (!chat) {
+        return res.status(404).json({ msg: 'Chat not found' });
+      }
 
-    if (!chat) {
-      return res.status(404).json({ msg: 'Chat not found' });
+      chat.messages.push({ role: 'assistant', content: content, model: model });
+      chat.model = model;
+      chat.updatedAt = new Date();
+      await chat.save();
+
+      res.json(chat);
+    } catch (err) {
+      console.error("CHOOSE ERROR:", err);
+      res.status(500).json({ msg: 'Selection failed', error: err.message });
     }
+  },
 
-    res.json({ msg: 'Chat deleted' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Server error' });
+  // Update title
+  updateTitle: async (req, res) => {
+    try {
+      const chat = await Chat.findOneAndUpdate(
+        { _id: req.params.chatId, user: req.user.id },
+        { title: req.body.title },
+        { new: true }
+      );
+      if (!chat) return res.status(404).json({ msg: 'Chat not found' });
+      res.json(chat);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ msg: 'Server error' });
+    }
+  },
+
+  // Delete chat
+  deleteChat: async (req, res) => {
+    try {
+      const chat = await Chat.findOneAndDelete({ _id: req.params.chatId, user: req.user.id });
+      if (!chat) return res.status(404).json({ msg: 'Chat not found' });
+      res.json({ msg: 'Chat deleted' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ msg: 'Server error' });
+    }
   }
-});
+};
 
-// Legacy chat endpoint (for backward compatibility)
-router.post('/', verifyToken, async (req, res) => {
-  const { messages, model = 'llama3.2:latest' } = req.body;
+// Define routes using the handlers
+router.get('/models', chatHandlers.getModels);
+router.get('/', verifyToken, chatHandlers.getChats);
+router.get('/search/:query', verifyToken, chatHandlers.searchChats);
+router.get('/:chatId', verifyToken, chatHandlers.getChatById);
+router.post('/new', verifyToken, chatHandlers.createNewChat);
+router.post('/:chatId', verifyToken, chatHandlers.sendMessage);
+router.post('/:chatId/multi', verifyToken, chatHandlers.multiLLM);
+router.post('/:chatId/choose', verifyToken, chatHandlers.chooseResponse);
+router.put('/:chatId/title', verifyToken, chatHandlers.updateTitle);
+router.delete('/:chatId', verifyToken, chatHandlers.deleteChat);
 
-  try {
-    const response = await axios.post('http://localhost:11434/api/chat', {
-      model,
-      messages,
-      stream: false,
-    });
-
-    res.json({ response: response.data.message });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Error communicating with Ollama' });
-  }
-});
-
-module.exports = router;
+module.exports = { router, chatHandlers };

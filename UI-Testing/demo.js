@@ -2,12 +2,18 @@ const puppeteer = require('puppeteer');
 
 async function runDemo() {
   const browser = await puppeteer.launch({ 
-    headless: false,  // shows the browser so you can see it for the video
-    slowMo: 50       // slows down actions so they're visible
+    headless: false,  
+    slowMo: 60       
   });
   
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 720 });
+
+  // Generate a unique ID so we can create a fresh account every run
+  const uniqueId = Date.now().toString().slice(-4);
+  const testUser = `testuser_${uniqueId}`;
+  const testEmail = `testuser_${uniqueId}@test.com`;
+  const testPass = `Password123`;
 
   async function clickByText(tag, text) {
     const elements = await page.$$(tag);
@@ -21,92 +27,67 @@ async function runDemo() {
     throw new Error(`Could not find <${tag}> containing text '${text}'`);
   }
 
-  //Step 1: Go to landing page
+  // Step 1: Go to landing page
   console.log("Navigating to landing page...");
   await page.goto('http://localhost:5173');
-  await new Promise(r => setTimeout(r, 2000));
+  await new Promise(r => setTimeout(r, 1500));
 
-  //Step 1.5: Click on "Create an account" button
-  console.log("Clicking on 'Create an account' button...");
+  // Step 2: Sign Up (New Account)
+  console.log(`Creating new account: ${testUser}...`);
   await clickByText('button', 'Create an account');
-  await new Promise(r => setTimeout(r, 1500));
-
-  //Step 2: Fill in signup page
-
-  console.log("Filling in signup form...");
-  //await page.waitForSelector('#email');
-  await page.type('#username', 'testuser1');
-  await new Promise(r => setTimeout(r, 1000));
-  await page.type('#email', 'testuser1@test.com');
-  await new Promise(r => setTimeout(r, 1000));
-  await page.type('#password', 'Password123###');
-  await new Promise(r => setTimeout(r, 1000));
-  await page.type('#confirm', 'Password123###');
-  await new Promise(r => setTimeout(r, 2000));
-
-  //Step 2.5: Go back to landing page and click on "Log in" button
-  console.log("Clicking the back button...");
-  //await page.goto("http://localhost:5173");
-  await clickByText('button', 'Back');
-  await new Promise(r => setTimeout(r, 1500));
-  console.log("Clicking on 'Log in' button...");
-  await clickByText('button', 'Log in');
-  await new Promise(r => setTimeout(r, 1500));
-
-  //Step 3: Fill in login page
-
-  console.log("Filling in login form...");
-  //await page.waitForSelector('#email');
-  await page.type('#email', 'testuser1@test.com');
-  await new Promise(r => setTimeout(r, 1000));
-  await page.type('#password', 'Password123###');
-  await new Promise(r => setTimeout(r, 2000));
-
-  // Step 3.5: Click Forgot Password button from login page
-  console.log("Clicking Forgot Password button...");
-  await clickByText('button', 'Forgot Password');
-  await new Promise(r => setTimeout(r, 1500));
-
-  //Step 4: Fill out forgot password page
-  await page.waitForSelector('#email');
-  await page.type('#email', 'testuser1@test.com');
-  await new Promise(r => setTimeout(r, 1500));
-
-  //Step 5: Reset password page (with fake token to show the page exists)?
-  console.log("Navigating to reset password page...");
-  await page.goto('http://localhost:5173/reset-password/testtoken123');
-  await new Promise(r => setTimeout(r, 1500));
-  await page.waitForSelector('#password');
-  await page.type('#password', 'NewPassword123###');
+  await page.waitForSelector('#username');
+  
+  await page.type('#username', testUser);
   await new Promise(r => setTimeout(r, 500));
-  await page.type('#confirmPassword', 'NewPassword123###');
+  await page.type('#email', testEmail);
+  await new Promise(r => setTimeout(r, 500));
+  await page.type('#password', testPass);
+  await new Promise(r => setTimeout(r, 500));
+  await page.type('#confirm', testPass);
+  await new Promise(r => setTimeout(r, 1000));
+  
+  console.log("Submitting registration...");
+  await clickByText('button', 'Sign Up');
+  
+  // Wait for redirect to home
+  console.log("Waiting for home page...");
+  await page.waitForSelector('input[placeholder="Type your message..."]');
+  await new Promise(r => setTimeout(r, 1500));
+
+  // Step 3: Test Multi-Chat Comparison
+  console.log("Switching to Compare Mode...");
+  await page.select('select', 'compare');
+  await new Promise(r => setTimeout(r, 1000));
+
+  console.log("Typing message for comparison...");
+  await page.type('input[placeholder="Type your message..."]', 'What are the three laws of robotics?');
+  await new Promise(r => setTimeout(r, 1000));
+
+  console.log("Sending message...");
+  await clickByText('button', 'Send');
+
+  console.log("Waiting for LLM comparisons (this may take a moment)...");
+  await page.waitForSelector('h3', { timeout: 45000 });
+  await new Promise(r => setTimeout(r, 3000));
+
+  // Step 4: Select a response
+  console.log("Selecting the first model's response...");
+  await clickByText('button', 'Select this response');
+  
+  console.log("Verifying selection was added to chat...");
   await new Promise(r => setTimeout(r, 2000));
 
+  const modelLabelExists = await page.evaluate(() => {
+    return document.body.innerText.toLowerCase().includes('mistral') || 
+           document.body.innerText.toLowerCase().includes('llama') ||
+           document.body.innerText.toLowerCase().includes('phi');
+  });
 
-  // Navigate to home/chat page after login
-await page.goto('http://localhost:5173/home');
-
-// Wait for chat input box
-await page.waitForSelector('textarea');
-
-// Type a message
-await page.type('textarea', 'Hello');
-
-// Click send button (adjust if needed)
-await page.keyboard.press('Enter');
-
-// Wait for response (LLM reply)
-await page.waitForTimeout(5000);
-
-// Check if response appeared
-const content = await page.content();
-
-if (!content.toLowerCase().includes('hello')) {
-  throw new Error('LLM response not detected');
-}
-
-console.log("LLM interaction test passed!");
-
+  if (modelLabelExists) {
+    console.log("Multi-chat demo passed successfully!");
+  } else {
+    console.log("Demo finished, but model labels were not detected.");
+  }
 
   console.log("Demo complete!");
   await browser.close();

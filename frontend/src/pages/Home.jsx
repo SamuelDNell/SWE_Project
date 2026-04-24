@@ -21,11 +21,39 @@ useEffect(() => {
     const [model, setModel] = useState("llama3.2:latest"); //updated default model to match backend
     const [loading, setLoading] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [sendMode, setSendMode] = useState("llama3.2:latest"); 
+    const [options, setOptions] = useState([]);
+    const [availableModels, setAvailableModels] = useState([
+        { id: "llama3.2:latest", name: "Llama 3.2" },
+        { id: "compare", name: "Compare 3 LLMs" }
+    ]);
 
-    // Load chats on component mount
+    // Load chats and models on component mount
     useEffect(() => {
         loadChats();
+        loadModels();
     }, []);
+
+    const loadModels = async () => {
+        try {
+            const response = await fetch("http://localhost:3000/api/chat/models");
+            if (response.ok) {
+                const data = await response.json();
+                const models = data.models.map(m => ({
+                    id: m.name,
+                    name: m.name.split(':')[0].toUpperCase().replace(/-/g, ' ')
+                }));
+                setAvailableModels([...models, { id: "compare", name: "Compare 3 LLMs" }]);
+                
+                // Set default sendMode if current one isn't in available models
+                if (!models.find(m => m.id === sendMode) && models.length > 0) {
+                    setSendMode(models[0].id);
+                }
+            }
+        } catch (err) {
+            console.error("Error loading models:", err);
+        }
+    };
 
     useEffect(() => {
     if (location.state?.chatId) {
@@ -69,6 +97,7 @@ useEffect(() => {
                 setCurrentChatId(chatId);
                 setMessages(chat.messages);
                 setModel(chat.model);
+                setOptions([]); // Clear options when switching chats
             }
         } catch (err) {
             console.error("Error loading chat:", err);
@@ -95,6 +124,7 @@ useEffect(() => {
                 setChats(prev => [newChat, ...prev]);
                 setCurrentChatId(newChat._id);
                 setMessages([]);
+                setOptions([]);
             }
         } catch (err) {
             console.error("Error creating new chat:", err);
@@ -117,7 +147,7 @@ useEffect(() => {
                     },
                     body: JSON.stringify({
                         title: input.length > 50 ? input.substring(0, 50) + "..." : input,
-                        model: "llama3.2:latest" //updated this to match backend default model
+                        model: sendMode === "compare" ? "llama3.2:latest" : sendMode
                     })
                 });
 
@@ -140,41 +170,89 @@ useEffect(() => {
         const userMessage = { role: "user", content: input };
         const updatedMessages = [...messages, userMessage];
         setMessages(updatedMessages);
+        const originalInput = input;
         setInput("");
         setLoading(true);
+        setOptions([]);
+
+        const isCompare = sendMode === "compare";
+        const top3Models = availableModels
+            .filter(m => m.id !== "compare")
+            .slice(0, 3)
+            .map(m => m.id);
 
         try {
             const token = localStorage.getItem("token");
-            const response = await fetch(`http://localhost:3000/api/chat/${chatId}`, {
+            const endpoint = isCompare ? `http://localhost:3000/api/chat/${chatId}/multi` : `http://localhost:3000/api/chat/${chatId}`;
+            
+            const response = await fetch(endpoint, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    message: input,
-                    model: model
+                    message: originalInput,
+                    model: sendMode,
+                    models: top3Models
                 })
             });
 
             if (response.ok) {
                 const data = await response.json();
-                setMessages(data.chat.messages);
-                // Update the chat in the chats list
+                if (isCompare) {
+                    setOptions(data.options);
+                    setMessages(data.chat.messages);
+                } else {
+                    setMessages(data.chat.messages);
+                }
+                
                 setChats(prev => prev.map(chat =>
-                    chat._id === chatId ? data.chat : chat
+                    chat._id === chatId ? (data.chat || chat) : chat
                 ));
             } else {
                 const errorData = await response.json();
                 alert(errorData.msg);
-                // Remove the user message if there was an error
                 setMessages(messages);
             }
         } catch (err) {
             console.error(err);
             alert("Could not connect to server.");
-            // Remove the user message if there was an error
             setMessages(messages);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSelectOption = async (option) => {
+        setLoading(true);
+        try {
+            const token = localStorage.getItem("token");
+            const response = await fetch(`http://localhost:3000/api/chat/${currentChatId}/choose`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    content: option.content,
+                    model: option.model
+                })
+            });
+
+            if (response.ok) {
+                const updatedChat = await response.json();
+                setMessages(updatedChat.messages);
+                setOptions([]);
+                setChats(prev => prev.map(chat =>
+                    chat._id === currentChatId ? updatedChat : chat
+                ));
+            } else {
+                alert("Failed to save selection");
+            }
+        } catch (err) {
+            console.error("Error selecting option:", err);
+            alert("Error saving selection");
         } finally {
             setLoading(false);
         }
@@ -282,15 +360,40 @@ useEffect(() => {
                                     key={index}
                                     className={`${styles.message} ${msg.role === 'user' ? styles.user : styles.assistant}`}
                                 >
+                                    {msg.role === 'assistant' && msg.model && (
+                                        <div className={styles.messageModel}>{msg.model}</div>
+                                    )}
                                     <div className={styles.messageContent}>
                                         {msg.content}
                                     </div>
                                 </div>
                             ))}
-                            {loading && (
+                            
+                            {options.length > 0 && (
+                                <div className={styles.optionsContainer}>
+                                    <h3>Choose the best response:</h3>
+                                    <div className={styles.optionsGrid}>
+                                        {options.map((opt, i) => (
+                                            <div key={i} className={styles.optionCard}>
+                                                <div className={styles.optionHeader}>{opt.model}</div>
+                                                <div className={styles.optionContent}>{opt.content}</div>
+                                                <button 
+                                                    className={styles.selectBtn}
+                                                    onClick={() => handleSelectOption(opt)}
+                                                    disabled={loading}
+                                                >
+                                                    Select this response
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {loading && options.length === 0 && (
                                 <div className={`${styles.message} ${styles.assistant}`}>
                                     <div className={styles.messageContent}>
-                                        Thinking...
+                                        {sendMode === "compare" ? 'Generating multiple responses...' : 'Thinking...'}
                                     </div>
                                 </div>
                             )}
@@ -309,13 +412,25 @@ useEffect(() => {
                             disabled={loading}
                             className={styles.input}
                         />
-                        <button
-                            onClick={handleSend}
-                            disabled={loading || !input.trim()}
-                            className={styles.sendBtn}
-                        >
-                            {loading ? '...' : 'Send'}
-                        </button>
+                        <div className={styles.sendControls}>
+                            <select 
+                                className={styles.modelSelect}
+                                value={sendMode}
+                                onChange={(e) => setSendMode(e.target.value)}
+                                disabled={loading}
+                            >
+                                {availableModels.map(m => (
+                                    <option key={m.id} value={m.id}>{m.name}</option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={handleSend}
+                                disabled={loading || !input.trim()}
+                                className={styles.sendBtn}
+                            >
+                                {loading ? '...' : 'Send'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
