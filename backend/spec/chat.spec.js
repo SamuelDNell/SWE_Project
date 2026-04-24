@@ -182,7 +182,9 @@ describe('Chat API', () => {
       expect(response.body.chat).toBeDefined();
       expect(response.body.chat.messages.length).toBe(2);
       expect(response.body.chat.messages[0].content).toBe('Hello');
-      expect(response.body.chat.messages[1].content).toBe('This is a mocked LLM response.');
+      expect(response.body.chat.messages[1].content).toContain('Model 1:');
+expect(response.body.chat.messages[1].content).toContain('Model 2:');
+expect(response.body.chat.messages[1].content).toContain('Model 3:');
     });
   });
 });

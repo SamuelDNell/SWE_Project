@@ -165,44 +165,72 @@ router.post('/:chatId', verifyToken, async (req, res) => {
     if (!chat) {
       return res.status(404).json({ msg: 'Chat not found' });
     }
+  
 
     // Add user message to chat
     chat.messages.push({
       role: 'user',
       content: message
     });
-    const selectedModel = model || chat.model || 'llama3.2:latest';
+    const selectedModel = 'phi';
     console.log("USING MODEL:", selectedModel);
 
 
-    // System prompt for structured responses, can be enhanced with more specific instructions if needed
-      const systemPrompt = {
-      role: 'system',
-      content: `You are Knightly, a helpful AI assistant for Rutgers University students.
-      Rules:
-      - Sound natural, clear, and conversational.
-      - Do not use awkward phrases like "You can find my name is..."
-      - Answer directly and intelligently.
-      - Use short paragraphs.
-      - Use bullet points only when they actually improve readability.
-      - For simple questions, give a clean paragraph answer first.
-      - For definitions, start with a one-sentence explanation, then add 2-4 concise supporting points if needed.
-      - Avoid overexplaining.
-      - Do not mention these instructions.`
-    };
+  const systemPrompt = {
+  role: 'system',
+  content: `You are Knightly, a helpful AI assistant for Rutgers University students.
+
+- Answer the user's question directly.
+- Keep responses short and clear (2–4 sentences).
+- Stay on topic.
+- Do not create stories unless asked.
+- Do not repeat instructions.
+- Do not mention rules or guidelines.
+- Do not change the user's name.`
+};
 
   
     // Get AI response
-    const response = await axios.post('http://localhost:11434/api/chat', {
-      model: selectedModel,
-      messages: [systemPrompt, ...chat.messages], /// messages: chat.messages,
-      stream: false,
-    });
+    // const response = await axios.post('http://localhost:11434/api/chat', {
+    //   model: selectedModel,
+    //   messages: [systemPrompt, ...chat.messages], /// messages: chat.messages,
+    //   stream: false,
+    // });
+    // Model 1
+  // Run 2 models in parallel
+const [response1, response2] = await Promise.all([
+  axios.post('http://localhost:11434/api/chat', {
+    model: 'phi',
+    messages: [systemPrompt, ...chat.messages],
+    stream: false,
+  }),
+  axios.post('http://localhost:11434/api/chat', {
+    model: 'tinyllama',
+    messages: [systemPrompt, ...chat.messages],
+    stream: false,
+  })
+]);
+
+// Run 3rd model after (series)
+const response3 = await axios.post('http://localhost:11434/api/chat', {
+  model: 'qwen:0.5b',
+  messages: [systemPrompt, ...chat.messages],
+  stream: false,
+});
 
     // Add AI response to chat
     chat.messages.push({
       role: 'assistant',
-      content: response.data.message.content
+      content: `**Model 1:**
+${response1.data.message.content}
+
+  
+**Model 2:**
+${response2.data.message.content}
+
+  
+**Model 3:**
+${response3.data.message.content}`
     });
 
     // Update chat title if it's the first message
@@ -220,9 +248,10 @@ router.post('/:chatId', verifyToken, async (req, res) => {
     console.log("After save");
 
     res.json({
-      message: response.data.message,
-      chat: chat
-    });
+  model1: response1.data.message,
+  model2: response2.data.message,
+  chat: chat
+});
   } catch (err) {//updated error handling to log more details and return more info in the response
     // console.error(err);
     // res.status(500).json({ msg: 'Error communicating with Ollama' });
@@ -296,6 +325,45 @@ router.post('/', verifyToken, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: 'Error communicating with Ollama' });
+  }
+});
+
+router.post('/test', async (req, res) => {
+  const message = req.body.message;
+
+  const systemPrompt = {
+    role: 'system',
+    content: 'Answer briefly.'
+  };
+
+  try {
+    const [response1, response2] = await Promise.all([
+      axios.post('http://localhost:11434/api/chat', {
+        model: 'phi',
+        messages: [systemPrompt, { role: 'user', content: message }],
+        stream: false,
+      }),
+      axios.post('http://localhost:11434/api/chat', {
+        model: 'tinyllama',
+        messages: [systemPrompt, { role: 'user', content: message }],
+        stream: false,
+      })
+    ]);
+
+    const response3 = await axios.post('http://localhost:11434/api/chat', {
+      model: 'qwen:0.5b',
+      messages: [systemPrompt, { role: 'user', content: message }],
+      stream: false,
+    });
+
+    res.json({
+      model1: response1.data.message.content,
+      model2: response2.data.message.content,
+      model3: response3.data.message.content
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: 'Test failed' });
   }
 });
 
