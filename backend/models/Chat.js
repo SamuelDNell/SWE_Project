@@ -4,11 +4,39 @@ const MessageSchema = new mongoose.Schema({
   role: {
     type: String,
     required: true,
-    enum: ['user', 'assistant']
+    enum: ['user', 'assistant', 'assistant_multi']
   },
   content: {
+    type: String
+  },
+  model: {
+    type: String
+  },
+  responses: [
+    {
+      model: {
+        type: String
+      },
+      content: {
+        type: String,
+        default: null
+      },
+      success: {
+        type: Boolean,
+        default: false
+      },
+      error: {
+        type: String,
+        default: null
+      }
+    }
+  ],
+  selectedModel: {
     type: String,
-    required: true
+    default: null
+  },
+  selectedAt: {
+    type: Date
   },
   timestamp: {
     type: Date,
@@ -31,6 +59,10 @@ const ChatSchema = new mongoose.Schema({
     type: String,
     default: "llama3.2:latest"
   },
+  modelSelected: {
+    type: Boolean,
+    default: false
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -40,11 +72,5 @@ const ChatSchema = new mongoose.Schema({
     default: Date.now
   }
 });
-
-// //Update the updatedAt field before saving
-// ChatSchema.pre('save', function(next) {
-//   this.updatedAt = Date.now();
-//   if (next) next();
-// });
 
 module.exports = mongoose.model('Chat', ChatSchema);

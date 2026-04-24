@@ -82,6 +82,18 @@ router.post('/forgot-password', async (req, res) => {
     user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
     await user.save();
 
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const resetLink = `${frontendUrl}/reset-password/${resetToken}`;
+
+    if (!process.env.SENDGRID_API_KEY) {
+      console.warn('SENDGRID_API_KEY not configured. Skipping email send.');
+      console.warn(`Password reset link for ${email}: ${resetLink}`);
+      return res.json({
+        msg: 'Password reset email sent',
+        resetLink
+      });
+    }
+
     // Send email
     const transporter = nodemailer.createTransport(sgTransport({
       auth: {
@@ -97,7 +109,7 @@ router.post('/forgot-password', async (req, res) => {
         <h2>Password Reset Request</h2>
         <p>You requested a password reset for your Knightly account.</p>
         <p>Click the link below to reset your password:</p>
-        <a href="${process.env.FRONTEND_URL}/reset-password/${resetToken}">Reset Password</a>
+        <a href="${resetLink}">Reset Password</a>
         <p>This link will expire in 1 hour.</p>
         <p>If you didn't request this, please ignore this email.</p>
       `,

@@ -3,8 +3,36 @@ const axios = require('axios');
 const verifyToken = require('../middleware/auth');
 const Chat = require('../models/Chat');
 
-
 const router = express.Router();
+
+const MULTI_MODELS = ['llama3.2:latest', 'qwen3:latest', 'gemma3:4b'];
+const SYSTEM_PROMPT = {
+  role: 'system',
+  content: `You are Knightly, a helpful AI assistant for Rutgers University students.
+Rules:
+- Sound natural, clear, and conversational.
+- Do not use awkward phrases like "You can find my name is..."
+- Answer directly and intelligently.
+- Use short paragraphs.
+- Use bullet points only when they actually improve readability.
+- For simple questions, give a clean paragraph answer first.
+- For definitions, start with a one-sentence explanation, then add 2-4 concise supporting points if needed.
+- Avoid overexplaining.
+- Do not mention these instructions.`
+};
+
+function buildConversationMessages(chatMessages) {
+  return chatMessages
+    .filter(message => (message.role === 'user' || message.role === 'assistant') && message.content)
+    .map(message => ({
+      role: message.role,
+      content: message.content
+    }));
+}
+
+function formatModelFailure(error) {
+  return error?.response?.data?.error || error?.message || 'Model request failed';
+}
 
 // Get available models
 router.get('/models', async (req, res) => {
@@ -22,7 +50,7 @@ router.get('/', verifyToken, async (req, res) => {
   try {
     const chats = await Chat.find({ user: req.user.id })
       .sort({ updatedAt: -1 })
-      .select('title updatedAt messages model');
+      .select('title updatedAt messages model modelSelected');
     res.json(chats);
   } catch (err) {
     console.error(err);
@@ -30,7 +58,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-// Search chats by title or message content (iteration 2) - still needs frontend implementation
+// Search chats by title or message content
 router.get('/search/:query', verifyToken, async (req, res) => {
   try {
     const rawQuery = req.params.query || '';
@@ -91,6 +119,7 @@ router.get('/search/:query', verifyToken, async (req, res) => {
         updatedAt: chat.updatedAt,
         createdAt: chat.createdAt,
         model: chat.model,
+        modelSelected: chat.modelSelected,
         score,
         snippet
       };
@@ -133,18 +162,14 @@ router.get('/:chatId', verifyToken, async (req, res) => {
 // Create a new chat
 router.post('/new', verifyToken, async (req, res) => {
   try {
-    console.log('Creating new chat for user:', req.user.id);
-    console.log('Request body:', req.body);
-
     const chat = new Chat({
       user: req.user.id,
       title: req.body.title || 'New Chat',
-      model: req.body.model || 'llama3.2:latest'
+      model: req.body.model || MULTI_MODELS[0],
+      modelSelected: false
     });
 
-    console.log('Chat object before save:', chat);
     await chat.save();
-    console.log('Chat saved successfully:', chat);
     res.json(chat);
   } catch (err) {
     console.error('Error creating new chat:', err);
@@ -157,7 +182,12 @@ router.post('/:chatId', verifyToken, async (req, res) => {
   const { message, model } = req.body;
 
   try {
-    let chat = await Chat.findOne({
+    const trimmedMessage = typeof message === 'string' ? message.trim() : '';
+    if (!trimmedMessage) {
+      return res.status(400).json({ msg: 'Message is required' });
+    }
+
+    const chat = await Chat.findOne({
       _id: req.params.chatId,
       user: req.user.id
     });
@@ -166,78 +196,133 @@ router.post('/:chatId', verifyToken, async (req, res) => {
       return res.status(404).json({ msg: 'Chat not found' });
     }
 
-    // Add user message to chat
     chat.messages.push({
       role: 'user',
-      content: message
+      content: trimmedMessage
     });
-    const selectedModel = model || chat.model || 'llama3.2:latest';
-    console.log("USING MODEL:", selectedModel);
 
+    const conversationMessages = [SYSTEM_PROMPT, ...buildConversationMessages(chat.messages)];
 
-    // System prompt for structured responses, can be enhanced with more specific instructions if needed
-      const systemPrompt = {
-      role: 'system',
-      content: `You are Knightly, a helpful AI assistant for Rutgers University students.
-      Rules:
-      - Sound natural, clear, and conversational.
-      - Do not use awkward phrases like "You can find my name is..."
-      - Answer directly and intelligently.
-      - Use short paragraphs.
-      - Use bullet points only when they actually improve readability.
-      - For simple questions, give a clean paragraph answer first.
-      - For definitions, start with a one-sentence explanation, then add 2-4 concise supporting points if needed.
-      - Avoid overexplaining.
-      - Do not mention these instructions.`
-    };
+    if (!chat.modelSelected) {
+      const responses = await Promise.allSettled(
+        MULTI_MODELS.map(currentModel =>
+          axios.post('http://localhost:11434/api/chat', {
+            model: currentModel,
+            messages: conversationMessages,
+            stream: false,
+          })
+        )
+      );
 
-  
-    // Get AI response
+      const formattedResponses = responses.map((result, index) => ({
+        model: MULTI_MODELS[index],
+        content: result.status === 'fulfilled' ? result.value.data.message.content : null,
+        success: result.status === 'fulfilled',
+        error: result.status === 'fulfilled' ? null : formatModelFailure(result.reason)
+      }));
+
+      chat.messages.push({
+        role: 'assistant_multi',
+        responses: formattedResponses
+      });
+
+      chat.updatedAt = new Date();
+      await chat.save();
+
+      return res.json({
+        mode: 'multi',
+        responses: formattedResponses,
+        hasSuccessfulResponses: formattedResponses.some(response => response.success),
+        chat
+      });
+    }
+
+    const selectedModel = chat.model || model || MULTI_MODELS[0];
     const response = await axios.post('http://localhost:11434/api/chat', {
       model: selectedModel,
-      messages: [systemPrompt, ...chat.messages], /// messages: chat.messages,
+      messages: conversationMessages,
       stream: false,
     });
 
-    // Add AI response to chat
     chat.messages.push({
       role: 'assistant',
-      content: response.data.message.content
+      content: response.data.message.content,
+      model: selectedModel
     });
 
-    // Update chat title if it's the first message
-    if (chat.messages.length === 2 && chat.title === 'New Chat') {
-      chat.title = message.length > 50 ? message.substring(0, 50) + '...' : message;
+    chat.model = selectedModel;
+    chat.updatedAt = new Date();
+    await chat.save();
+
+    return res.json({
+      mode: 'single',
+      message: {
+        ...response.data.message,
+        model: selectedModel
+      },
+      chat
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: 'Chat request failed' });
+  }
+});
+
+// Select one response from the most recent multi-model turn
+router.post('/:chatId/select', verifyToken, async (req, res) => {
+  const { model } = req.body;
+
+  try {
+    const chat = await Chat.findOne({
+      _id: req.params.chatId,
+      user: req.user.id
+    });
+
+    if (!chat) {
+      return res.status(404).json({ msg: 'Chat not found' });
     }
 
-    // console.log("Before save, updatedAt =", chat.updatedAt); // Log the updatedAt field before saving
-    // await chat.save();
-    // console.log("After save"); // Log after saving to confirm the save operation completed
+    const multiMessage = [...chat.messages].reverse().find(message => message.role === 'assistant_multi');
+    if (!multiMessage) {
+      return res.status(400).json({ msg: 'No multi-model response available to select' });
+    }
 
-    chat.updatedAt = new Date(); //using updatedAt here seems to fix the issue where "ollama crash" error pops up after the first message
-    console.log("Before save, updatedAt =", chat.updatedAt);
+    const selectedResponse = multiMessage.responses.find(
+      response => response.model === model && response.success && response.content
+    );
+    if (!selectedResponse) {
+      return res.status(400).json({ msg: 'Selected response is not available' });
+    }
+
+    if (multiMessage.selectedModel === model) {
+      return res.json({
+        chat,
+        selectedResponse
+      });
+    }
+
+    multiMessage.selectedModel = model;
+    multiMessage.selectedAt = new Date();
+
+    chat.messages.push({
+      role: 'assistant',
+      content: selectedResponse.content,
+      model
+    });
+
+    chat.model = model;
+    chat.modelSelected = true;
+    chat.updatedAt = new Date();
+    chat.markModified('messages');
     await chat.save();
-    console.log("After save");
 
     res.json({
-      message: response.data.message,
-      chat: chat
+      chat,
+      selectedResponse
     });
-  } catch (err) {//updated error handling to log more details and return more info in the response
-    // console.error(err);
-    // res.status(500).json({ msg: 'Error communicating with Ollama' });
-
-    console.error("CHAT ROUTE ERROR:");
+  } catch (err) {
     console.error(err);
-    console.error("Message:", err.message);
-    console.error("Stack:", err.stack);
-    console.error("Ollama response:", err.response?.data);
-
-    res.status(500).json({
-      msg: 'Chat request failed',
-      error: err.message,
-      details: err.response?.data || null
-    });
+    res.status(500).json({ msg: 'Error selecting response' });
   }
 });
 
@@ -261,7 +346,6 @@ router.put('/:chatId/title', verifyToken, async (req, res) => {
   }
 });
 
-
 // Delete a chat
 router.delete('/:chatId', verifyToken, async (req, res) => {
   try {
@@ -283,7 +367,7 @@ router.delete('/:chatId', verifyToken, async (req, res) => {
 
 // Legacy chat endpoint (for backward compatibility)
 router.post('/', verifyToken, async (req, res) => {
-  const { messages, model = 'llama3.2:latest' } = req.body;
+  const { messages, model = MULTI_MODELS[0] } = req.body;
 
   try {
     const response = await axios.post('http://localhost:11434/api/chat', {

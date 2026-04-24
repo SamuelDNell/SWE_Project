@@ -4,6 +4,7 @@
     "puppeteer": "^24.39.1"
   },
   "scripts": {
-    "test": "cucumber-js"
+    "test": "cucumber-js",
+    "demo": "node demo.js"
   }
 }

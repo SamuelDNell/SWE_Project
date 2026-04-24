@@ -1,12 +1,15 @@
 # SWE_Project
-
+Bhanavi Senthil (bs1121) Individual Iteration
 ## Backend Setup
 
 1. Navigate to the backend directory: `cd backend`
 2. Install dependencies: `npm install`
-3. Set up environment variables in `.env` (copy from `.env` file)
+3. Set up environment variables in `.env`
 4. Ensure MongoDB is running locally or update MONGODB_URI
-5. Ensure Ollama is running locally
+5. Ensure Ollama is running locally with the models used by this project:
+   - `llama3.2:latest`
+   - `qwen3:latest`
+   - `gemma3:4b`
 6. Run the server: `npm run dev`
 
 ### Authentication
@@ -25,17 +28,17 @@
 - Error handling for API requests
 - Proxy endpoints to Ollama for LLM interactions
 - Model listing endpoint to query available Ollama models
-- Chat endpoint supporting conversational message format
+- Chat endpoints supporting both multi-model comparison and single-model continuation
+- Chat history and chat search endpoints for authenticated users
+- Response-selection endpoint to choose one model output and continue the conversation with it
 
 ### Database
 - MongoDB integration using Mongoose ODM
 - User model with fields: username, email, password, resetPasswordToken, resetPasswordExpires, createdAt
-- Chat model with fields: user, title, messages[], model, createdAt, updatedAt
-- Message sub-schema with fields: role, content, timestamp
+- Chat model with fields: user, title, messages[], model, modelSelected, createdAt, updatedAt
+- Message sub-schema with support for standard assistant messages and grouped multi-model responses
 - Connection handling with environment variable configuration
 - Schema validation for user and chat data
-
-### API Endpoints
 
 ### API Endpoints
 
@@ -46,13 +49,32 @@
 - POST /api/auth/reset-password/:token - Reset password with token
 - POST /api/auth/reset-password - Reset password (placeholder)
 - GET /api/chat - Get all user chats (requires auth)
+- GET /api/chat/search/:query - Search chats for the logged-in user (requires auth)
 - GET /api/chat/:chatId - Get specific chat (requires auth)
 - POST /api/chat/new - Create new chat (requires auth)
 - POST /api/chat/:chatId - Send message in chat (requires auth)
+- POST /api/chat/:chatId/select - Select one model response and continue with that model (requires auth)
 - PUT /api/chat/:chatId/title - Update chat title (requires auth)
 - DELETE /api/chat/:chatId - Delete chat (requires auth)
 - GET /api/chat/models - Get list of available Ollama models
 - POST /api/chat - Send chat message to Ollama (requires auth)
 
 ## Frontend Setup
-Similar to backend, navigate to frontend using cd and then npm install, followed by npm run dev
+1. Navigate to the frontend directory: `cd frontend`
+2. Install dependencies: `npm install`
+3. Run the frontend: `npm run dev`
+
+### Frontend Features
+- Login, account creation, and password reset pages
+- Chat interface that sends one prompt to three LLMs and displays all three responses
+- Ability to select one response and continue the conversation with that model only
+- Chat history page with recent-first ordering and search
+
+## Testing
+
+- Backend unit tests: `cd backend && npm test`
+- Frontend unit tests: `cd frontend && npm test`
+- UI/Cucumber tests: `cd UI-Testing && npm test`
+- Puppeteer demo: `cd UI-Testing && npm run demo`
+
+See [TESTING.md](./TESTING.md) for more detailed testing instructions.

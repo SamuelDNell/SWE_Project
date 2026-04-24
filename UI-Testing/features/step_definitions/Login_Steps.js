@@ -2,62 +2,58 @@ const { Given, When, Then } = require('@cucumber/cucumber');
 const assert = require('assert');
 
 Given('I am on the login page', async function () {
-  await this.page.goto('http://localhost:5173');
-  await this.clickByText('button', 'Log in');
+  await this.gotoPath('/login');
 });
 
 When('I enter a valid login username and password', async function () {
-  await this.page.waitForSelector('#email');
-  await this.page.type('#email', 'testuser1@test.com');
-  await this.page.type('#password', 'Password123###');
+  await this.clearAndType('#email', this.testEmail);
+  await this.clearAndType('#password', this.testPassword);
 });
 
-// Then('I should be logged in', async function () {
-//   // Logic to verify success would go here
-//   assert.ok(true);
-// });
-
 Then('I should be logged in', async function () {
-  await this.clickByText('button', 'Log in');
+  await this.clickByText('button', 'Log In');
+  await this.page.waitForFunction(
+    () => window.location.pathname === '/home',
+    { timeout: 60000 }
+  );
 
-  // wait for something to happen
-  await new Promise(resolve => setTimeout(resolve, 2000));
-
-  // check that page didn't crash and input exists
-  const emailExists = await this.page.$('#email') !== null;
-
-  if (!emailExists) {
-    throw new Error('Login page broke or element missing');
-  }
+  const bodyText = await this.page.evaluate(() => document.body.innerText);
+  assert.ok(bodyText.includes('Knightly AI Assistant'));
 });
 
 When('I enter a valid username and invalid password', async function () {
-  await this.page.waitForSelector('#email');
-  await this.page.type('#email', 'testuser1@test.com');
-  await this.page.type('#password', 'wrongpassword');
+  await this.clearAndType('#email', this.testEmail);
+  await this.clearAndType('#password', 'definitely-wrong-password');
+  this.dialogPromise = new Promise((resolve) => this.page.once('dialog', resolve));
+  await this.clickByText('button', 'Log In');
 });
 
 Then('I should see an incorrect password error message', async function () {
-  // Logic to verify error message would go here
-  assert.ok(true);
+  const dialog = await this.dialogPromise;
+  assert.ok(dialog.message().toLowerCase().includes('invalid credentials'));
+  await dialog.accept();
 });
 
 When('I enter an invalid username', async function () {
-  await this.page.waitForSelector('#email');
-  await this.page.type('#email', 'invalid@test.com');
-  await this.page.type('#password', 'anypassword');
+  await this.clearAndType('#email', 'invalid@example.com');
+  await this.clearAndType('#password', this.testPassword);
+  this.dialogPromise = new Promise((resolve) => this.page.once('dialog', resolve));
+  await this.clickByText('button', 'Log In');
 });
 
 Then('I should see a invalid username error message', async function () {
-  // Logic to verify error message would go here
-  assert.ok(true);
+  const dialog = await this.dialogPromise;
+  assert.ok(dialog.message().toLowerCase().includes('invalid credentials'));
+  await dialog.accept();
 });
 
 When('I do not enter a username or password', async function () {
-  // Do nothing
+  this.dialogPromise = new Promise((resolve) => this.page.once('dialog', resolve));
+  await this.clickByText('button', 'Log In');
 });
 
 Then('I should see a missing credentials error message', async function () {
-  // Logic to verify error message would go here
-  assert.ok(true);
+  const dialog = await this.dialogPromise;
+  assert.ok(dialog.message().toLowerCase().includes('invalid credentials'));
+  await dialog.accept();
 });

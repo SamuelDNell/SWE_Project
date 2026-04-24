@@ -1,108 +1,80 @@
-# Unit Testing with Jasmine
+# Testing Guide
 
-This project includes comprehensive unit tests using the Jasmine testing framework to ensure the web user interface for LLM inference works correctly.
+This iteration adds coverage for the multi-model chat flow, authenticated chat history, and response selection workflow.
 
-## Test Results ✅
+## What is covered
 
-### Backend Tests
-- **Status**: ✅ All tests passing
-- **Specs**: 9 specs, 0 failures
-- **Coverage**: Authentication API endpoints (registration, login, user info)
+### Backend
+- Authenticated chat creation in compare mode
+- Authenticated chat history retrieval sorted by `updatedAt`
+- User isolation for chat detail access
+- One prompt fanout to three models
+- Partial model failure handling with successful responses still returned
+- Selecting one model response and continuing the conversation with that model only
 
-### Frontend Tests
-- **Status**: ✅ All tests passing
-- **Specs**: 14 specs, 0 failures
-- **Coverage**: UI components, forms, browser storage, API integration
+### Frontend
+- Shared chat UI helper logic for:
+  - sorting chat history
+  - compare-mode vs selected-model labels
+  - header/composer text changes after selection
+  - timestamp formatting fallback
 
-## Features Tested
+### Browser automation
+- Login
+- Start a new chat
+- Submit one prompt
+- Verify the three response cards render
+- Select one model response
+- Send a follow-up prompt in single-model mode
+- Open chat history
 
-### 1. Landing Page ✅
-- Basic DOM structure and element presence
-- Welcome message display
+## Run the tests
 
-### 2. User Account Creation ✅
-- Successful user registration
-- Duplicate email prevention
-- Required field validation
-- Password confirmation matching
-- Username length validation
+### Backend specs
+Requires MongoDB running locally at `mongodb://localhost:27017/chatbot_test`.
 
-### 3. User Login/Logout ✅
-- Successful authentication with valid credentials
-- Invalid credential rejection
-- Token-based user info retrieval
-- Proper logout functionality
-- JWT token storage in localStorage
-
-## Running the Tests
-
-### Backend API Tests
 ```bash
 cd backend
 npm test
 ```
 
-### Frontend UI Tests
+### Frontend specs
+These are Jasmine unit tests for chat helper logic and browser-storage basics.
+
 ```bash
 cd frontend
 npm test
 ```
 
-## Test Structure
+### Cucumber UI tests
+Runs the existing feature suite under `UI-Testing/features`.
 
-### Backend Tests (`/backend/spec/`)
-- **auth.spec.js**: Tests for authentication endpoints
-  - User registration API
-  - User login API
-  - User info retrieval API
+```bash
+cd UI-Testing
+npm test
+```
 
-### Frontend Tests (`/frontend/spec/`)
-- **ui.spec.js**: Tests for user interface components
-  - Landing page functionality
-  - Login form validation
-  - Registration form validation
-  - Chat interface elements
-  - Browser storage operations
-  - API integration availability
+### Puppeteer demo for this iteration
+This is the fastest way to visually verify the new multi-model workflow.
 
-## Testing Setup
+Prerequisites:
+- frontend running on `http://localhost:5173`
+- backend running on `http://localhost:3000`
+- Ollama running locally with `llama3.2:latest`, `qwen3:latest`, and `gemma3:4b`
+- a login account available
 
-### Backend Testing
-- **Framework**: Jasmine with jasmine-supertest
-- **Database**: MongoDB test database
-- **Environment**: NODE_ENV=test for conditional server startup
-- **Dependencies**: supertest for HTTP testing
+Optional environment variables:
+- `FRONTEND_URL`
+- `DEMO_EMAIL`
+- `DEMO_PASSWORD`
 
-### Frontend Testing
-- **Framework**: Jasmine with jasmine-dom
-- **Browser Simulation**: jsdom for DOM environment
-- **Mocking**: Custom mocks for localStorage and fetch API
-- **Environment**: ES modules with helper setup
+```bash
+cd UI-Testing
+npm run demo
+```
 
-## Configuration Files
+## Notes
 
-- `backend/spec/support/jasmine.json`: Backend test configuration
-- `frontend/spec/support/jasmine.json`: Frontend test configuration
-- `frontend/spec/helpers/setup.js`: Browser environment setup for frontend tests
-  - API integration mocking
-
-## Test Dependencies
-
-### Backend
-- `jasmine`: Testing framework
-- `jasmine-supertest`: HTTP endpoint testing
-- `supertest`: API testing utilities
-
-### Frontend
-- `jasmine`: Testing framework
-- `jasmine-dom`: DOM testing utilities
-
-## Test Coverage
-
-The tests cover the three main requirements:
-
-1. **Landing Page**: Ensures the initial page loads correctly
-2. **User Account Creation**: Validates the registration process
-3. **Login/Logout**: Confirms authentication flow works properly
-
-All tests are designed to run independently and include proper setup/teardown to ensure test isolation.
+- The backend specs stub the Ollama chat calls with `axios` spies, so they do not require the models to be installed.
+- The Puppeteer demo is intended for end-to-end verification and does require the full stack to be running.
+- Chat history and chat detail endpoints are authenticated and scoped to the logged-in user only.
