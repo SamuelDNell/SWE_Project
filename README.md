@@ -1,5 +1,7 @@
 # SWE_Project
-Bhanavi Senthil (bs1121) Individual Iteration
+
+Bhanavi Senthil Individual Iteration Version (bs1121)
+
 ## Backend Setup
 
 1. Navigate to the backend directory: `cd backend`
