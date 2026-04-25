@@ -10,6 +10,9 @@ const MessageSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  model: {
+    type: String
+  },
   timestamp: {
     type: Date,
     default: Date.now
@@ -41,10 +44,5 @@ const ChatSchema = new mongoose.Schema({
   }
 });
 
-// //Update the updatedAt field before saving
-// ChatSchema.pre('save', function(next) {
-//   this.updatedAt = Date.now();
-//   if (next) next();
-// });
 
 module.exports = mongoose.model('Chat', ChatSchema);
