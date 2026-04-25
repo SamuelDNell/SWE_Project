@@ -192,18 +192,28 @@ router.post('/:chatId', verifyToken, async (req, res) => {
     };
 
   
-    // Get AI response
-    const response = await axios.post('http://localhost:11434/api/chat', {
-      model: selectedModel,
-      messages: [systemPrompt, ...chat.messages], /// messages: chat.messages,
-      stream: false,
-    });
+// Models you want to run simultaneously
+const modelsToRun = ['phi', 'llama3.2:latest'];
 
-    // Add AI response to chat
-    chat.messages.push({
-      role: 'assistant',
-      content: response.data.message.content
-    });
+// Call both models at the same time
+const responses = await Promise.all(
+  modelsToRun.map(m =>
+    axios.post('http://localhost:11434/api/chat', {
+      model: m,
+      messages: [systemPrompt, ...chat.messages],
+      stream: false,
+    })
+  )
+);
+
+// Save BOTH responses
+responses.forEach((res, index) => {
+  chat.messages.push({
+    role: 'assistant',
+    content: res.data.message.content,
+    model: modelsToRun[index] // 🔥 THIS is key for frontend labeling
+  });
+});
 
     // Update chat title if it's the first message
     if (chat.messages.length === 2 && chat.title === 'New Chat') {
@@ -220,7 +230,10 @@ router.post('/:chatId', verifyToken, async (req, res) => {
     console.log("After save");
 
     res.json({
-      message: response.data.message,
+      messages: responses.map((res, index) => ({
+        ...res.data.message,
+        model: modelsToRun[index]
+      })),
       chat: chat
     });
   } catch (err) {//updated error handling to log more details and return more info in the response
