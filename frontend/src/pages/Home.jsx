@@ -18,9 +18,10 @@ useEffect(() => {
     const [chats, setChats] = useState([]);
     const [currentChatId, setCurrentChatId] = useState(null);
     const [showModal, setShowModal] = useState(false);
-    const [model, setModel] = useState("llama3.2:latest"); //updated default model to match backend
+    const [model, setModel] = useState("llama3.2:latest");
     const [loading, setLoading] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [multiMode, setMultiMode] = useState(false);
 
     // Load chats on component mount
     useEffect(() => {
@@ -117,7 +118,7 @@ useEffect(() => {
                     },
                     body: JSON.stringify({
                         title: input.length > 50 ? input.substring(0, 50) + "..." : input,
-                        model: "llama3.2:latest" //updated this to match backend default model
+                        model: "llama3.2:latest"
                     })
                 });
 
@@ -153,9 +154,10 @@ useEffect(() => {
                 },
                 body: JSON.stringify({
                     message: input,
-                    model: model
+                    model: model,
+                    multi: multiMode
+                    })
                 })
-            });
 
             if (response.ok) {
                 const data = await response.json();
@@ -254,6 +256,15 @@ useEffect(() => {
     <h1>Knightly AI Assistant</h1>
 
     <div>
+    <label style={{ marginRight: '10px' }}>
+        Multi
+        <input
+            type="checkbox"
+            checked={multiMode}
+            onChange={() => setMultiMode(prev => !prev)}
+            style={{ marginLeft: '5px' }}
+        />
+    </label>
         <button onClick={() => navigate('/history')}>
             History
         </button>
@@ -277,16 +288,23 @@ useEffect(() => {
                         </div>
                     ) : (
                         <div className={styles.messages}>
-                            {messages.map((msg, index) => (
-                                <div
-                                    key={index}
-                                    className={`${styles.message} ${msg.role === 'user' ? styles.user : styles.assistant}`}
-                                >
-                                    <div className={styles.messageContent}>
-                                        {msg.content}
-                                    </div>
-                                </div>
-                            ))}
+    {messages.map((msg, index) => (
+        <div
+            key={index}
+            className={`${styles.message} ${msg.role === 'user' ? styles.user : styles.assistant}`}
+        >
+            <div className={styles.messageContent}>
+
+                {msg.role === 'assistant' && msg.model && (
+                    <div style={{ fontSize: '12px', opacity: 0.7, marginBottom: '4px' }}>
+                        {msg.model}
+                    </div>
+                )}
+
+                {msg.content}
+                </div>
+                        </div>
+                         ))}
                             {loading && (
                                 <div className={`${styles.message} ${styles.assistant}`}>
                                     <div className={styles.messageContent}>
