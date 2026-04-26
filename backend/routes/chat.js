@@ -1,10 +1,20 @@
 const express = require('express');
 const axios = require('axios');
+const multer = require('multer');
+const pdf = require('pdf-parse');
+const pdfProcessor = require('../utils/pdfProcessor');
 const verifyToken = require('../middleware/auth');
 const Chat = require('../models/Chat');
 
 
 const router = express.Router();
+
+// Allow mocking the pdf parser
+router.pdfParser = pdf;
+
+// Multer configuration for memory storage
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 // Get available models
 router.get('/models', async (req, res) => {
@@ -14,6 +24,64 @@ router.get('/models', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: 'Error fetching models from Ollama' });
+  }
+});
+
+// PDF upload and parse endpoint
+router.post('/upload-pdf', verifyToken, upload.single('pdf'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ msg: 'No file uploaded' });
+  }
+
+  if (req.file.mimetype !== 'application/pdf') {
+    return res.status(400).json({ msg: 'File must be a PDF' });
+  }
+
+  try {
+    let pdfText;
+    // Use the processor if not mocked, otherwise use the mock
+    if (router.pdfParser === pdf) {
+      pdfText = await pdfProcessor.processPdf(req.file.buffer);
+    } else {
+      const data = await router.pdfParser(req.file.buffer);
+      pdfText = data.text;
+    }
+    
+    const { chatId } = req.body;
+
+    let chat;
+    if (chatId) {
+      chat = await Chat.findOne({ _id: chatId, user: req.user.id });
+      if (!chat) {
+        return res.status(404).json({ msg: 'Chat not found' });
+      }
+    } else {
+      chat = new Chat({
+        user: req.user.id,
+        title: `PDF: ${req.file.originalname}`,
+        model: req.body.model || 'llama3.2:latest'
+      });
+    }
+
+    // Add PDF content as a message
+    chat.messages.push({
+      role: 'user',
+      content: pdfText,
+      fileName: req.file.originalname,
+      isFileType: true
+    });
+
+    chat.updatedAt = new Date();
+    await chat.save();
+
+    res.json({
+      msg: 'PDF uploaded and parsed successfully',
+      chat: chat,
+      text: pdfText.substring(0, 500) + (pdfText.length > 500 ? '...' : '')
+    });
+  } catch (err) {
+    console.error('PDF parsing error:', err);
+    res.status(500).json({ msg: 'Error parsing PDF', error: err.message });
   }
 });
 

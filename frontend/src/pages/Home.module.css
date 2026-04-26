@@ -242,6 +242,13 @@
     word-wrap: break-word;
 }
 
+.fileMessage {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+}
+
 .message.user .messageContent {
     background-color: #378ADD;
     color: white;
@@ -268,6 +275,26 @@
     display: flex;
     gap: 0.75rem;
     align-items: center;
+}
+
+.uploadBtn {
+    width: 48px;
+    height: 48px;
+    background-color: rgba(55, 138, 221, 0.1);
+    border: 1.5px solid GrayText;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 20px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.uploadBtn:hover {
+    background-color: rgba(55, 138, 221, 0.2);
+    border-color: #378ADD;
 }
 
 .input {

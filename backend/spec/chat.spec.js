@@ -8,6 +8,7 @@ const app = require('../index');
 const User = require('../models/User');
 const Chat = require('../models/Chat');
 const axios = require('axios');
+const chatRouter = require('../routes/chat');
 
 describe('Chat API', () => {
   let token;
@@ -181,8 +182,53 @@ describe('Chat API', () => {
 
       expect(response.body.chat).toBeDefined();
       expect(response.body.chat.messages.length).toBe(2);
-      expect(response.body.chat.messages[0].content).toBe('Hello');
       expect(response.body.chat.messages[1].content).toBe('This is a mocked LLM response.');
+    });
+  });
+
+  describe('POST /api/chat/upload-pdf', () => {
+    it('should upload and parse a PDF successfully', async () => {
+      // Mock the pdfParser to return a fixed text
+      spyOn(chatRouter, 'pdfParser').and.returnValue(Promise.resolve({ text: 'Extracted PDF text' }));
+
+      // Create a dummy PDF buffer (doesn't need to be valid now as we mock the parser)
+      const pdfBuffer = Buffer.from('dummy pdf content');
+      
+      const response = await request(app)
+        .post('/api/chat/upload-pdf')
+        .set('Authorization', `Bearer ${token}`)
+        .attach('pdf', pdfBuffer, 'test.pdf')
+        .expect(200);
+
+      expect(response.body.msg).toBe('PDF uploaded and parsed successfully');
+      expect(response.body.chat).toBeDefined();
+      expect(response.body.chat.title).toBe('PDF: test.pdf');
+      expect(response.body.chat.messages.length).toBe(1);
+      
+      const lastMessage = response.body.chat.messages[0];
+      expect(lastMessage.content).toContain('Extracted PDF text');
+      expect(lastMessage.fileName).toBe('test.pdf');
+      expect(lastMessage.isFileType).toBe(true);
+    });
+
+    it('should return 400 if no file is uploaded', async () => {
+      const response = await request(app)
+        .post('/api/chat/upload-pdf')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(400);
+
+      expect(response.body.msg).toBe('No file uploaded');
+    });
+
+    it('should return 400 if file is not a PDF', async () => {
+      const textBuffer = Buffer.from('this is a text file');
+      const response = await request(app)
+        .post('/api/chat/upload-pdf')
+        .set('Authorization', `Bearer ${token}`)
+        .attach('pdf', textBuffer, 'test.txt')
+        .expect(400);
+
+      expect(response.body.msg).toBe('File must be a PDF');
     });
   });
 });

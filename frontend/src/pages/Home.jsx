@@ -21,6 +21,7 @@ useEffect(() => {
     const [model, setModel] = useState("llama3.2:latest"); //updated default model to match backend
     const [loading, setLoading] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [uploading, setUploading] = useState(false);
 
     // Load chats on component mount
     useEffect(() => {
@@ -98,6 +99,61 @@ useEffect(() => {
             }
         } catch (err) {
             console.error("Error creating new chat:", err);
+        }
+    };
+
+    const handlePdfUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (file.type !== 'application/pdf') {
+            alert('Please upload a PDF file.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('pdf', file);
+        if (currentChatId) {
+            formData.append('chatId', currentChatId);
+        }
+        formData.append('model', model);
+
+        setUploading(true);
+        try {
+            const token = localStorage.getItem("token");
+            const response = await fetch("http://localhost:3000/api/chat/upload-pdf", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setMessages(data.chat.messages);
+                setCurrentChatId(data.chat._id);
+                
+                // Update or add the chat in the chats list
+                setChats(prev => {
+                    const exists = prev.find(c => c._id === data.chat._id);
+                    if (exists) {
+                        return prev.map(c => c._id === data.chat._id ? data.chat : c);
+                    } else {
+                        return [data.chat, ...prev];
+                    }
+                });
+            } else {
+                const errorData = await response.json();
+                alert(errorData.msg || 'Failed to upload PDF');
+            }
+        } catch (err) {
+            console.error("Error uploading PDF:", err);
+            alert("Could not upload PDF.");
+        } finally {
+            setUploading(false);
+            // Reset input
+            e.target.value = '';
         }
     };
 
@@ -283,7 +339,13 @@ useEffect(() => {
                                     className={`${styles.message} ${msg.role === 'user' ? styles.user : styles.assistant}`}
                                 >
                                     <div className={styles.messageContent}>
-                                        {msg.content}
+                                        {msg.isFileType ? (
+                                            <div className={styles.fileMessage}>
+                                                <span role="img" aria-label="file">📄</span> {msg.fileName}
+                                            </div>
+                                        ) : (
+                                            msg.content
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -300,18 +362,28 @@ useEffect(() => {
 
                 <div className={styles.inputArea}>
                     <div className={styles.inputContainer}>
+                        <label className={styles.uploadBtn} title="Upload PDF">
+                            <input
+                                type="file"
+                                accept=".pdf"
+                                onChange={handlePdfUpload}
+                                style={{ display: 'none' }}
+                                disabled={loading || uploading}
+                            />
+                            {uploading ? '...' : '📄'}
+                        </label>
                         <input
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
                             placeholder="Type your message..."
-                            disabled={loading}
+                            disabled={loading || uploading}
                             className={styles.input}
                         />
                         <button
                             onClick={handleSend}
-                            disabled={loading || !input.trim()}
+                            disabled={loading || uploading || !input.trim()}
                             className={styles.sendBtn}
                         >
                             {loading ? '...' : 'Send'}
