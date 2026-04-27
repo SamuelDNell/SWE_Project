@@ -37,8 +37,12 @@ const ChatSchema = new mongoose.Schema({
   },
   models: {
     type: [String],
-    default: ["llama3.2:latest"]
+    default: ["ollama:llama3.2:latest"]
   },
+  documents: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Document'
+  }],
   createdAt: {
     type: Date,
     default: Date.now

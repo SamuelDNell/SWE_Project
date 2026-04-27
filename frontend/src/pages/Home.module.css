@@ -188,6 +188,28 @@
     gap: 1rem;
 }
 
+.modelSelectorActions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.collapseBtn {
+    padding: 0.35rem 0.6rem;
+    background: transparent;
+    color: GrayText;
+    border: 1px solid GrayText;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.collapseBtn:hover {
+    color: ButtonText;
+    border-color: ButtonText;
+}
+
 .modelModeLabel {
     margin: 0;
     font-size: 13px;
@@ -220,6 +242,71 @@
     flex-wrap: wrap;
     gap: 0.75rem;
     margin-top: 0.75rem;
+}
+
+.documentRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.deleteDocBtn {
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    color: GrayText;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 0.25rem;
+    border-radius: 4px;
+    transition: color 0.15s;
+}
+
+.deleteDocBtn:hover {
+    color: #e05c5c;
+}
+
+.documentSection {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.documentHeader {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+}
+
+.uploadRow {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.fileInput {
+    flex: 1;
+    min-width: 240px;
+    color: CanvasText;
+}
+
+.uploadError {
+    margin: 0;
+    color: #ff6666;
+    font-size: 13px;
+}
+
+.documentList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
 }
 
 .modelOption {
