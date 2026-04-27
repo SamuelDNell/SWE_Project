@@ -146,5 +146,7 @@ const queryProvider = async (selectedModel, messages, documentContext) => {
 module.exports = {
   getAvailableProviderModels,
   queryProvider,
-  parseModelKey
+  parseModelKey,
+  buildSystemPrompt,
+  dedupeConsecutiveRoles
 };

@@ -6,7 +6,13 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "test": "jasmine",
+    "test:acceptance": "cucumber-js",
     "lint": "eslint ."
+  },
+  "cucumber": {
+    "paths": ["features/**/*.feature"],
+    "require": ["features/support/*.js", "features/step_definitions/*.js"],
+    "format": ["progress-bar"]
   },
   "keywords": [],
   "author": "",
@@ -29,10 +35,12 @@
     "pdf-parse": "^1.1.1"
   },
   "devDependencies": {
+    "@cucumber/cucumber": "^12.8.2",
     "eslint": "^9.39.4",
     "jasmine": "^6.1.0",
     "jasmine-supertest": "^1.0.0",
     "nodemon": "^3.1.14",
+    "sinon": "^21.1.2",
     "supertest": "^7.2.2"
   }
 }
