@@ -37,7 +37,11 @@ module.exports = [
         beforeAll: 'readonly',
         afterAll: 'readonly',
         beforeEach: 'readonly',
-        expect: 'readonly'
+        afterEach: 'readonly',
+        expect: 'readonly',
+        spyOn: 'readonly',
+        jasmine: 'readonly',
+        fail: 'readonly'
       }
     }
   },

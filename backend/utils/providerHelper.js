@@ -48,11 +48,11 @@ const parseModelKey = (selectedModel) => {
 };
 
 const buildSystemPrompt = (documentContext) => {
-  let prompt = `You are Knightly, a smart and concise AI assistant for Rutgers University students. Answer questions directly and use uploaded documents as relevant context.`;
+  let prompt = 'You are Knightly, a smart and concise AI assistant for Rutgers University students. Answer questions directly and use uploaded documents as relevant context.';
   if (documentContext) {
     prompt += `\n\nUse the following documents as context when answering user questions:\n${documentContext}`;
   }
-  prompt += `\n\nIf the user asks a question unrelated to the documents, answer using your general knowledge and do not invent file contents.`;
+  prompt += '\n\nIf the user asks a question unrelated to the documents, answer using your general knowledge and do not invent file contents.';
   return prompt;
 };
 

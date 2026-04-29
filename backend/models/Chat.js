@@ -33,11 +33,11 @@ const ChatSchema = new mongoose.Schema({
   messages: [MessageSchema],
   model: {
     type: String,
-    default: "llama3.2:latest"
+    default: 'llama3.2:latest'
   },
   models: {
     type: [String],
-    default: ["ollama:llama3.2:latest"]
+    default: ['ollama:llama3.2:latest']
   },
   documents: [{
     type: mongoose.Schema.Types.ObjectId,
