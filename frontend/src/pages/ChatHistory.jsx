@@ -162,8 +162,6 @@ export default function ChatHistory() {
     }
   };
 
-  const [hoverDeleteId, setHoverDeleteId] = useState(null);
-
   const handleClickChat = (id) => {
     navigate("/home", { state: { chatId: id } });
   };
