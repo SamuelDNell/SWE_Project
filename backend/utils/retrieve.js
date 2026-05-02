@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const Document = require('../models/Document');
-const { embedText } = require('./embedder');
+const embedder = require('./embedder');
 
 const cosineSimilarity = (a, b) => {
   let dot = 0, magA = 0, magB = 0;
@@ -15,7 +15,7 @@ const cosineSimilarity = (a, b) => {
 const retrieveRelevantChunks = async (query, documentIds, userId, topK = 5) => {
   if (!documentIds || documentIds.length === 0) return [];
 
-  const queryEmbedding = await embedText(query);
+  const queryEmbedding = await embedder.embedText(query);
   const docObjectIds = documentIds.map((id) => new mongoose.Types.ObjectId(id));
   const userObjectId = new mongoose.Types.ObjectId(userId);
 
@@ -78,4 +78,4 @@ const retrieveRelevantChunks = async (query, documentIds, userId, topK = 5) => {
   return allChunks.sort((a, b) => b.score - a.score).slice(0, topK);
 };
 
-module.exports = { retrieveRelevantChunks };
+module.exports = { retrieveRelevantChunks, cosineSimilarity };
