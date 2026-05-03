@@ -2,6 +2,7 @@ const axios = require('axios');
 const { OpenAI } = require('openai');
 const { Anthropic } = require('@anthropic-ai/sdk');
 const { GoogleGenAI } = require('@google/genai');
+const { retrieveRelevantChunks } = require('./retrieve');
 
 const openaiApiKey = process.env.OPENAI_API_KEY;
 const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
@@ -47,11 +48,23 @@ const parseModelKey = (selectedModel) => {
   return { provider: 'ollama', model: selectedModel };
 };
 
-const buildSystemPrompt = (documentContext) => {
+const buildSystemPrompt = async (query, documentIds, userId) => {
   let prompt = 'You are Knightly, a smart and concise AI assistant for Rutgers University students. Answer questions directly and use uploaded documents as relevant context.';
-  if (documentContext) {
-    prompt += `\n\nUse the following documents as context when answering user questions:\n${documentContext}`;
+
+  if (documentIds && documentIds.length > 0) {
+    try {
+      const chunks = await retrieveRelevantChunks(query, documentIds, userId);
+      if (chunks.length > 0) {
+        const context = chunks
+          .map((c) => `File: ${c.filename}\n${c.text}`)
+          .join('\n---\n');
+        prompt += `\n\nUse the following documents as context when answering user questions:\n${context}`;
+      }
+    } catch (err) {
+      console.error('RAG retrieval error:', err.message);
+    }
   }
+
   prompt += '\n\nIf the user asks a question unrelated to the documents, answer using your general knowledge and do not invent file contents.';
   return prompt;
 };
@@ -74,9 +87,8 @@ const dedupeConsecutiveRoles = (messages) => {
   return result;
 };
 
-const queryProvider = async (selectedModel, messages, documentContext) => {
+const queryProvider = async (selectedModel, messages, systemPrompt) => {
   const { provider, model } = parseModelKey(selectedModel);
-  const systemPrompt = buildSystemPrompt(documentContext);
   const cleanMessages = dedupeConsecutiveRoles(messages);
 
   if (provider === 'openai') {
