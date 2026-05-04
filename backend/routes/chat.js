@@ -5,7 +5,8 @@ const pdfParse = require('pdf-parse');
 const verifyToken = require('../middleware/auth');
 const Chat = require('../models/Chat');
 const Document = require('../models/Document');
-const { queryProvider, getAvailableProviderModels } = require('../utils/providerHelper');
+const { queryProvider, getAvailableProviderModels, buildSystemPrompt } = require('../utils/providerHelper');
+const { chunkText, embedText } = require('../utils/embedder');
 
 const router = express.Router();
 const upload = multer({
@@ -77,12 +78,22 @@ router.post('/documents/upload', verifyToken, upload.single('document'), async (
       return res.status(415).json({ msg: 'Unsupported file type. Upload PDF or text files.' });
     }
 
+    const rawChunks = chunkText(content);
+    const chunks = await Promise.all(
+      rawChunks.map(async (text, index) => ({
+        text,
+        embedding: await embedText(text),
+        index
+      }))
+    );
+
     const document = new Document({
       user: req.user.id,
       filename: originalname,
       contentType: mimetype,
       size,
-      content
+      content,
+      chunks
     });
     await document.save();
 
@@ -243,18 +254,15 @@ router.post('/:chatId', verifyToken, async (req, res) => {
       : (chat.models && chat.models.length ? chat.models : [chat.model || 'ollama:llama3.2:latest']);
 
     const requestedDocumentIds = Array.isArray(documentIds) ? documentIds : [];
-    const activeDocumentIds = requestedDocumentIds.length ? requestedDocumentIds : chat.documents || [];
-    const documents = activeDocumentIds.length
-      ? await Document.find({ _id: { $in: activeDocumentIds }, user: req.user.id })
-      : [];
+    const activeDocumentIds = requestedDocumentIds.length
+      ? requestedDocumentIds
+      : (chat.documents || []).map(String);
 
-    const documentContext = documents
-      .map((doc) => `File: ${doc.filename}\n${doc.content.slice(0, 2800)}`)
-      .join('\n\n');
+    const systemPrompt = await buildSystemPrompt(message, activeDocumentIds, req.user.id);
 
     const results = await Promise.allSettled(
       selectedModels.map((selectedModel) =>
-        queryProvider(selectedModel, chat.messages, documentContext)
+        queryProvider(selectedModel, chat.messages, systemPrompt)
       )
     );
 
