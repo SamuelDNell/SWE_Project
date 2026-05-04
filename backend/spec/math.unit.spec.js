@@ -120,13 +120,8 @@ describe('Math Tooling Unit Tests', () => {
       expect(prompt).toContain('Use it for any numeric computation');
     });
 
-    it('does NOT include math instructions for openai', () => {
-      const prompt = buildSystemPrompt(null, 'openai');
-      expect(prompt).not.toContain('solve_math');
-    });
-
-    it('does NOT include math instructions for anthropic', () => {
-      const prompt = buildSystemPrompt(null, 'anthropic');
+    it('does NOT include math instructions when no provider is given', () => {
+      const prompt = buildSystemPrompt(null, null);
       expect(prompt).not.toContain('solve_math');
     });
 

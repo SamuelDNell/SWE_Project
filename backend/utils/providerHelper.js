@@ -1,15 +1,7 @@
-const { OpenAI } = require('openai');
-const { Anthropic } = require('@anthropic-ai/sdk');
 const { ollamaChat } = require('./ollamaChat');
 const { groqChat } = require('./groqChat');
 
 const OLLAMA_BASE_URL = 'http://localhost:11434';
-
-const openaiApiKey = process.env.OPENAI_API_KEY;
-const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-
-const openaiClient = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
-const anthropicClient = anthropicApiKey ? new Anthropic({ apiKey: anthropicApiKey }) : null;
 
 const PROVIDER_MODELS = [
   { name: 'groq:llama-3.3-70b-versatile', label: 'Groq - Llama 3.3 70B' },
@@ -28,15 +20,11 @@ const parseModelKey = (selectedModel) => {
   if (selectedModel.includes(':')) {
     const [provider, ...rest] = selectedModel.split(':');
     const modelName = rest.join(':');
-    if (provider === 'openai') return { provider: 'openai', model: modelName };
-    if (provider === 'anthropic') return { provider: 'anthropic', model: modelName };
     if (provider === 'groq') return { provider: 'groq', model: modelName };
     if (provider === 'ollama') return { provider: 'ollama', model: modelName };
   }
 
   const normalized = selectedModel.toLowerCase();
-  if (normalized.startsWith('gpt-')) return { provider: 'openai', model: selectedModel };
-  if (normalized.startsWith('claude')) return { provider: 'anthropic', model: selectedModel };
   if (normalized.includes('llama') && !selectedModel.startsWith('ollama:')) return { provider: 'groq', model: selectedModel };
   if (normalized.includes('llama')) return { provider: 'ollama', model: selectedModel.replace(/^ollama:/, '') };
 
@@ -85,36 +73,6 @@ const queryProvider = async (selectedModel, messages, documentContext) => {
   const { provider, model } = parseModelKey(selectedModel);
   const systemPrompt = buildSystemPrompt(documentContext, provider);
   const cleanMessages = dedupeConsecutiveRoles(messages);
-
-  if (provider === 'openai') {
-    if (!openaiClient) {
-      throw new Error('OpenAI API key is not configured. Set OPENAI_API_KEY in .env.');
-    }
-
-    const response = await openaiClient.chat.completions.create({
-      model,
-      messages: [{ role: 'system', content: systemPrompt }, ...cleanMessages],
-      temperature: 0.7,
-      max_tokens: 1000
-    });
-
-    return response.choices?.[0]?.message?.content?.trim() || '';
-  }
-
-  if (provider === 'anthropic') {
-    if (!anthropicClient) {
-      throw new Error('Anthropic API key is not configured. Set ANTHROPIC_API_KEY in .env.');
-    }
-
-    const response = await anthropicClient.messages.create({
-      model,
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: cleanMessages
-    });
-
-    return response.content?.[0]?.text?.trim() || '';
-  }
 
   if (provider === 'groq') {
     return await groqChat(cleanMessages, systemPrompt, model);

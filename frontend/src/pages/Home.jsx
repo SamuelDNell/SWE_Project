@@ -29,9 +29,9 @@ useEffect(() => {
     const [input, setInput] = useState("");
     const [chats, setChats] = useState([]);
     const [currentChatId, setCurrentChatId] = useState(null);
-    const [model, setModel] = useState("openai:gpt-4o");
+    const [model, setModel] = useState("groq:llama-3.3-70b-versatile");
     const [availableModels, setAvailableModels] = useState(DEFAULT_MODEL_OPTIONS);
-    const [selectedModels, setSelectedModels] = useState(["openai:gpt-4o"]);
+    const [selectedModels, setSelectedModels] = useState(["groq:llama-3.3-70b-versatile"]);
     const [compareMode, setCompareMode] = useState(true);
     const [documents, setDocuments] = useState([]);
     const [selectedDocuments, setSelectedDocuments] = useState([]);
@@ -91,8 +91,8 @@ useEffect(() => {
                 setAvailableModels(mergedModels);
                 if (mergedModels.length > 0) {
                     const defaults = mergedModels.slice(0, 2);
-                    setSelectedModels(defaults.length ? defaults : ["openai:gpt-4o"]);
-                    setModel(defaults[0] || "openai:gpt-4o");
+                    setSelectedModels(defaults.length ? defaults : ["groq:llama-3.3-70b-versatile"]);
+                    setModel(defaults[0] || "groq:llama-3.3-70b-versatile");
                 }
             } else {
                 setAvailableModels(DEFAULT_MODEL_OPTIONS);
@@ -195,8 +195,8 @@ useEffect(() => {
 
             if (response.ok) {
                 const chat = await response.json();
-                const chatModels = chat.models?.length ? chat.models : [chat.model || "openai:gpt-4o"];
-                const firstModel = chat.model || chatModels[0] || "openai:gpt-4o";
+                const chatModels = chat.models?.length ? chat.models : [chat.model || "groq:llama-3.3-70b-versatile"];
+                const firstModel = chat.model || chatModels[0] || "groq:llama-3.3-70b-versatile";
                 const chatDocs = (chat.documents || []).map((doc) => typeof doc === 'string' ? doc : doc._id);
                 setCurrentChatId(chatId);
                 setMessages(chat.messages);

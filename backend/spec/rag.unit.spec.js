@@ -66,12 +66,12 @@ describe('RAG Unit Tests', () => {
     it('removes extra assistant messages produced by compare mode, keeping the first', () => {
       const msgs = [
         { role: 'user', content: 'what is RAG?' },
-        { role: 'assistant', content: 'GPT answer', model: 'openai:gpt-4o' },
-        { role: 'assistant', content: 'Gemini answer', model: 'gemini:gemini-2.5-flash' }
+        { role: 'assistant', content: 'Groq answer', model: 'groq:llama-3.3-70b-versatile' },
+        { role: 'assistant', content: 'Ollama answer', model: 'ollama:llama3.2:latest' }
       ];
       const result = dedupeConsecutiveRoles(msgs);
       expect(result.length).toBe(2);
-      expect(result[1].content).toBe('GPT answer');
+      expect(result[1].content).toBe('Groq answer');
     });
 
     it('handles multiple rounds of compare-mode responses', () => {
@@ -98,22 +98,16 @@ describe('RAG Unit Tests', () => {
   // ─── parseModelKey ─────────────────────────────────────────────────────────
 
   describe('parseModelKey()', () => {
-    it('parses openai provider', () => {
-      const { provider, model } = parseModelKey('openai:gpt-4o');
-      expect(provider).toBe('openai');
-      expect(model).toBe('gpt-4o');
+    it('parses groq provider', () => {
+      const { provider, model } = parseModelKey('groq:llama-3.3-70b-versatile');
+      expect(provider).toBe('groq');
+      expect(model).toBe('llama-3.3-70b-versatile');
     });
 
-    it('parses anthropic provider', () => {
-      const { provider, model } = parseModelKey('anthropic:claude-3-5-sonnet-20241022');
-      expect(provider).toBe('anthropic');
-      expect(model).toBe('claude-3-5-sonnet-20241022');
-    });
-
-    it('parses gemini provider', () => {
-      const { provider, model } = parseModelKey('gemini:gemini-2.5-flash');
-      expect(provider).toBe('gemini');
-      expect(model).toBe('gemini-2.5-flash');
+    it('parses groq with a different model', () => {
+      const { provider, model } = parseModelKey('groq:llama-3.1-8b-instant');
+      expect(provider).toBe('groq');
+      expect(model).toBe('llama-3.1-8b-instant');
     });
 
     it('parses ollama with nested colons correctly', () => {
