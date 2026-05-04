@@ -5,8 +5,9 @@ const pdfParse = require('pdf-parse');
 const verifyToken = require('../middleware/auth');
 const Chat = require('../models/Chat');
 const Document = require('../models/Document');
-const { queryProvider, getAvailableProviderModels, buildSystemPrompt } = require('../utils/providerHelper');
+const { queryProvider, getAvailableProviderModels } = require('../utils/providerHelper');
 const { chunkText, embedText } = require('../utils/embedder');
+const { retrieveRelevantChunks } = require('../utils/retrieve');
 
 const router = express.Router();
 const upload = multer({
@@ -258,11 +259,17 @@ router.post('/:chatId', verifyToken, async (req, res) => {
       ? requestedDocumentIds
       : (chat.documents || []).map(String);
 
-    const systemPrompt = await buildSystemPrompt(message, activeDocumentIds, req.user.id);
+    let documentContext = '';
+    if (activeDocumentIds.length > 0) {
+      const chunks = await retrieveRelevantChunks(message, activeDocumentIds, req.user.id);
+      if (chunks.length > 0) {
+        documentContext = chunks.map((c) => `[${c.filename}]\n${c.text}`).join('\n\n');
+      }
+    }
 
     const results = await Promise.allSettled(
       selectedModels.map((selectedModel) =>
-        queryProvider(selectedModel, chat.messages, systemPrompt)
+        queryProvider(selectedModel, chat.messages, documentContext)
       )
     );
 
