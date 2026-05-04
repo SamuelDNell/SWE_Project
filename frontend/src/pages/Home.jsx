@@ -1,15 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
 import styles from './Home.module.css'
 
 const DEFAULT_MODEL_OPTIONS = [
-    'openai:gpt-4o',
-    'openai:gpt-3.5-turbo',
-    'anthropic:claude-3-5-sonnet-20241022',
-    'anthropic:claude-3-5-haiku-20241022',
-    'gemini:gemini-2.5-flash',
-    'gemini:gemini-2.0-flash-lite',
+    'groq:llama-3.3-70b-versatile',
+    'groq:llama-3.1-8b-instant',
     'ollama:llama3.2:latest',
     'ollama:llama2:7b',
     'ollama:llama4:latest'
@@ -423,15 +422,11 @@ useEffect(() => {
 
     const formatModelLabel = (modelKey) => {
         const labelMap = {
-            'openai:gpt-4o': 'GPT-4o',
-            'openai:gpt-3.5-turbo': 'GPT-3.5 Turbo',
-            'anthropic:claude-3-5-sonnet-20241022': 'Claude 3.5 Sonnet',
-            'anthropic:claude-3-5-haiku-20241022': 'Claude 3.5 Haiku',
-            'gemini:gemini-2.5-flash': 'Gemini 2.5 Flash',
-            'gemini:gemini-2.0-flash-lite': 'Gemini 2.0 Flash Lite',
+            'groq:llama-3.3-70b-versatile': 'Groq Llama 3.3 70B',
+            'groq:llama-3.1-8b-instant': 'Groq Llama 3.1 8B',
         };
         if (labelMap[modelKey]) return labelMap[modelKey];
-        const prefixes = ['openai', 'anthropic', 'vertex', 'ollama'];
+        const prefixes = ['groq', 'ollama'];
         for (const prefix of prefixes) {
             if (modelKey.startsWith(prefix + ':')) {
                 return modelKey.slice(prefix.length + 1);
@@ -665,7 +660,10 @@ useEffect(() => {
                                             {msg.role === 'assistant' && msg.model && (
                                                 <div className={styles.messageModelLabel}>{formatModelLabel(msg.model)}</div>
                                             )}
-                                            <ReactMarkdown>
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkMath]}
+                                                rehypePlugins={[rehypeKatex]}
+                                            >
                                                 {msg.content}
                                             </ReactMarkdown>
                                             {showSelectButton && msg.model && (

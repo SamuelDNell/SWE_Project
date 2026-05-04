@@ -1,24 +1,21 @@
-const axios = require('axios');
 const { OpenAI } = require('openai');
 const { Anthropic } = require('@anthropic-ai/sdk');
-const { GoogleGenAI } = require('@google/genai');
-const { retrieveRelevantChunks } = require('./retrieve');
+const Groq = require('groq-sdk');
+const { ollamaMathChat } = require('./ollamaMathChat');
+
+const OLLAMA_BASE_URL = 'http://localhost:11434';
 
 const openaiApiKey = process.env.OPENAI_API_KEY;
 const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-const googleApiKey = process.env.GOOGLE_API_KEY;
+const groqApiKey = process.env.GROQ_API_KEY;
 
 const openaiClient = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
 const anthropicClient = anthropicApiKey ? new Anthropic({ apiKey: anthropicApiKey }) : null;
-const genAI = googleApiKey ? new GoogleGenAI({ apiKey: googleApiKey }) : null;
+const groqClient = groqApiKey ? new Groq({ apiKey: groqApiKey }) : null;
 
 const PROVIDER_MODELS = [
-  { name: 'openai:gpt-4o', label: 'OpenAI - gpt-4o' },
-  { name: 'openai:gpt-3.5-turbo', label: 'OpenAI - gpt-3.5-turbo' },
-  { name: 'anthropic:claude-3-5-sonnet-20241022', label: 'Anthropic - Claude 3.5 Sonnet' },
-  { name: 'anthropic:claude-3-5-haiku-20241022', label: 'Anthropic - Claude 3.5 Haiku' },
-  { name: 'gemini:gemini-2.5-flash', label: 'Google - Gemini 2.5 Flash' },
-  { name: 'gemini:gemini-2.0-flash-lite', label: 'Google - Gemini 2.0 Flash Lite' }
+  { name: 'groq:llama-3.3-70b-versatile', label: 'Groq - Llama 3.3 70B' },
+  { name: 'groq:llama-3.1-8b-instant', label: 'Groq - Llama 3.1 8B' }
 ];
 
 const OLLAMA_DEFAULT_MODELS = [
@@ -35,36 +32,38 @@ const parseModelKey = (selectedModel) => {
     const modelName = rest.join(':');
     if (provider === 'openai') return { provider: 'openai', model: modelName };
     if (provider === 'anthropic') return { provider: 'anthropic', model: modelName };
-    if (provider === 'gemini') return { provider: 'gemini', model: modelName };
+    if (provider === 'groq') return { provider: 'groq', model: modelName };
     if (provider === 'ollama') return { provider: 'ollama', model: modelName };
   }
 
   const normalized = selectedModel.toLowerCase();
   if (normalized.startsWith('gpt-')) return { provider: 'openai', model: selectedModel };
   if (normalized.startsWith('claude')) return { provider: 'anthropic', model: selectedModel };
-  if (normalized.startsWith('gemini')) return { provider: 'gemini', model: selectedModel };
+  if (normalized.includes('llama') && !selectedModel.startsWith('ollama:')) return { provider: 'groq', model: selectedModel };
   if (normalized.includes('llama')) return { provider: 'ollama', model: selectedModel.replace(/^ollama:/, '') };
 
   return { provider: 'ollama', model: selectedModel };
 };
 
-const buildSystemPrompt = async (query, documentIds, userId) => {
+const buildSystemPrompt = (documentContext, provider = null) => {
   let prompt = 'You are Knightly, a smart and concise AI assistant for Rutgers University students. Answer questions directly and use uploaded documents as relevant context.';
-
-  if (documentIds && documentIds.length > 0) {
-    try {
-      const chunks = await retrieveRelevantChunks(query, documentIds, userId);
-      if (chunks.length > 0) {
-        const context = chunks
-          .map((c) => `File: ${c.filename}\n${c.text}`)
-          .join('\n---\n');
-        prompt += `\n\nUse the following documents as context when answering user questions:\n${context}`;
-      }
-    } catch (err) {
-      console.error('RAG retrieval error:', err.message);
-    }
+  if (documentContext) {
+    prompt += `\n\nUse the following documents as context when answering user questions:\n${documentContext}`;
   }
-
+  if (provider === 'ollama') {
+    prompt += '\n\nYou have access to a solve_math tool that computes math exactly. ' +
+      'ALWAYS use it for any numeric computation, derivative, integral, or statistical calculation. ' +
+      'After getting the tool result, explain the solution step by step using LaTeX formatting:\n' +
+      '- Inline math: $expression$\n' +
+      '- Block math: $$expression$$\n' +
+      'Never compute math mentally — always call the tool first, then explain.';
+  }
+  if (provider === 'groq') {
+    prompt += '\n\nWhen answering math questions, always format your response using LaTeX:\n' +
+      '- Inline math: $expression$\n' +
+      '- Block math: $$expression$$\n' +
+      'Show your working step by step.';
+  }
   prompt += '\n\nIf the user asks a question unrelated to the documents, answer using your general knowledge and do not invent file contents.';
   return prompt;
 };
@@ -87,8 +86,9 @@ const dedupeConsecutiveRoles = (messages) => {
   return result;
 };
 
-const queryProvider = async (selectedModel, messages, systemPrompt) => {
+const queryProvider = async (selectedModel, messages, documentContext) => {
   const { provider, model } = parseModelKey(selectedModel);
+  const systemPrompt = buildSystemPrompt(documentContext, provider);
   const cleanMessages = dedupeConsecutiveRoles(messages);
 
   if (provider === 'openai') {
@@ -121,35 +121,23 @@ const queryProvider = async (selectedModel, messages, systemPrompt) => {
     return response.content?.[0]?.text?.trim() || '';
   }
 
-  if (provider === 'gemini') {
-    if (!genAI) {
-      throw new Error('Google API key is not configured. Set GOOGLE_API_KEY in .env.');
+  if (provider === 'groq') {
+    if (!groqClient) {
+      throw new Error('Groq API key is not configured. Set GROQ_API_KEY in .env.');
     }
 
-    const history = cleanMessages.slice(0, -1).map((msg) => ({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }]
-    }));
-    const lastMessage = cleanMessages[cleanMessages.length - 1];
-
-    const chat = genAI.chats.create({
+    const response = await groqClient.chat.completions.create({
       model,
-      config: { systemInstruction: systemPrompt },
-      history
+      messages: [{ role: 'system', content: systemPrompt }, ...cleanMessages],
+      temperature: 0.7,
+      max_tokens: 1024
     });
 
-    const response = await chat.sendMessage({ message: lastMessage.content });
-    return response.text.trim();
+    return response.choices?.[0]?.message?.content?.trim() || '';
   }
 
   if (provider === 'ollama') {
-    const response = await axios.post('http://localhost:11434/api/chat', {
-      model,
-      messages: [{ role: 'system', content: systemPrompt }, ...cleanMessages],
-      stream: false
-    });
-
-    return response.data?.message?.content?.trim() || '';
+    return await ollamaMathChat(cleanMessages, systemPrompt, OLLAMA_BASE_URL, model);
   }
 
   throw new Error(`Unsupported provider: ${provider}`);

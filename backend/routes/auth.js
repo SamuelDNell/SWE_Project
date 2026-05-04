@@ -28,7 +28,7 @@ router.post('/register', async (req, res) => {
       if (err) throw err;
       res.json({ token });
     });
-  } catch (err) {
+  } catch {
     res.status(500).json({ msg: 'Server error' });
   }
 });
@@ -48,7 +48,7 @@ router.post('/login', async (req, res) => {
       if (err) throw err;
       res.json({ token });
     });
-  } catch (err) {
+  } catch {
     res.status(500).json({ msg: 'Server error' });
   }
 });
@@ -58,7 +58,7 @@ router.get('/user', verifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     res.json(user);
-  } catch (err) {
+  } catch {
     res.status(500).json({ msg: 'Server error' });
   }
 });
@@ -129,7 +129,7 @@ router.get('/test-reset-token', async (req, res) => {
       resetLink: `http://localhost:5174/reset-password/${resetToken}`,
       token: resetToken
     });
-  } catch (err) {
+  } catch {
     res.status(500).json({ msg: 'Server error' });
   }
 });

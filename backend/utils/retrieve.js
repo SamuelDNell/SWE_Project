@@ -46,7 +46,7 @@ const retrieveRelevantChunks = async (query, documentIds, userId, topK = 5) => {
       text: r.chunks?.[0]?.text || '',
       score: r.score
     }));
-  } catch (_) {
+  } catch {
     // $vectorSearch not available (local MongoDB) — fall through to JS similarity
   }
 
