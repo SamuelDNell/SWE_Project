@@ -41,7 +41,8 @@ module.exports = [
         expect: 'readonly',
         spyOn: 'readonly',
         jasmine: 'readonly',
-        fail: 'readonly'
+        fail: 'readonly',
+        expectAsync: 'readonly'
       }
     }
   },

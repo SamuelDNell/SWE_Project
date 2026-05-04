@@ -1,17 +1,15 @@
 const { OpenAI } = require('openai');
 const { Anthropic } = require('@anthropic-ai/sdk');
-const Groq = require('groq-sdk');
-const { ollamaMathChat } = require('./ollamaMathChat');
+const { ollamaChat } = require('./ollamaChat');
+const { groqChat } = require('./groqChat');
 
 const OLLAMA_BASE_URL = 'http://localhost:11434';
 
 const openaiApiKey = process.env.OPENAI_API_KEY;
 const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-const groqApiKey = process.env.GROQ_API_KEY;
 
 const openaiClient = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
 const anthropicClient = anthropicApiKey ? new Anthropic({ apiKey: anthropicApiKey }) : null;
-const groqClient = groqApiKey ? new Groq({ apiKey: groqApiKey }) : null;
 
 const PROVIDER_MODELS = [
   { name: 'groq:llama-3.3-70b-versatile', label: 'Groq - Llama 3.3 70B' },
@@ -50,19 +48,16 @@ const buildSystemPrompt = (documentContext, provider = null) => {
   if (documentContext) {
     prompt += `\n\nUse the following documents as context when answering user questions:\n${documentContext}`;
   }
-  if (provider === 'ollama') {
-    prompt += '\n\nYou have access to a solve_math tool that computes math exactly. ' +
-      'ALWAYS use it for any numeric computation, derivative, integral, or statistical calculation. ' +
-      'After getting the tool result, explain the solution step by step using LaTeX formatting:\n' +
+  if (provider === 'ollama' || provider === 'groq') {
+    prompt += '\n\nYou have access to a get_weather tool for real-time weather data. ' +
+      'Use it whenever the user asks about weather, temperature, forecast, or conditions in any location. ' +
+      'Present weather results clearly with current conditions and forecast if requested. ' +
+      'Always specify the units: °F for temperature, mph for wind speed.\n' +
+      'You also have access to a solve_math tool for exact calculations. ' +
+      'Use it for any numeric computation, derivative, integral, or statistical calculation. ' +
+      'After getting tool results, format math using LaTeX:\n' +
       '- Inline math: $expression$\n' +
-      '- Block math: $$expression$$\n' +
-      'Never compute math mentally — always call the tool first, then explain.';
-  }
-  if (provider === 'groq') {
-    prompt += '\n\nWhen answering math questions, always format your response using LaTeX:\n' +
-      '- Inline math: $expression$\n' +
-      '- Block math: $$expression$$\n' +
-      'Show your working step by step.';
+      '- Block math: $$expression$$';
   }
   prompt += '\n\nIf the user asks a question unrelated to the documents, answer using your general knowledge and do not invent file contents.';
   return prompt;
@@ -122,22 +117,11 @@ const queryProvider = async (selectedModel, messages, documentContext) => {
   }
 
   if (provider === 'groq') {
-    if (!groqClient) {
-      throw new Error('Groq API key is not configured. Set GROQ_API_KEY in .env.');
-    }
-
-    const response = await groqClient.chat.completions.create({
-      model,
-      messages: [{ role: 'system', content: systemPrompt }, ...cleanMessages],
-      temperature: 0.7,
-      max_tokens: 1024
-    });
-
-    return response.choices?.[0]?.message?.content?.trim() || '';
+    return await groqChat(cleanMessages, systemPrompt, model);
   }
 
   if (provider === 'ollama') {
-    return await ollamaMathChat(cleanMessages, systemPrompt, OLLAMA_BASE_URL, model);
+    return await ollamaChat(cleanMessages, systemPrompt, OLLAMA_BASE_URL, model);
   }
 
   throw new Error(`Unsupported provider: ${provider}`);
