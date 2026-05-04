@@ -31,6 +31,8 @@ Before(async function () {
   await Chat.deleteMany({});
   await Document.deleteMany({});
 
+  process.env.GROQ_API_KEY = 'test_groq_key';
+
   const res = await request(app)
     .post('/api/auth/register')
     .send({ username: 'cucumberuser', email: 'cucumber@test.com', password: 'password123' });
@@ -42,7 +44,10 @@ Before(async function () {
   this.uploadedDocIds = [];
   this.activeChatId = null;
   this.capturedLLMPayload = null;
+  this.capturedGroqPayload = null;
+  this.toolResult = null;
   this.axiosStub = null;
+  this.axiosGetStub = null;
 });
 
 After(async function () {
@@ -50,6 +55,11 @@ After(async function () {
     this.axiosStub.restore();
     this.axiosStub = null;
   }
+  if (this.axiosGetStub) {
+    this.axiosGetStub.restore();
+    this.axiosGetStub = null;
+  }
+  delete process.env.GROQ_API_KEY;
 });
 
 class RagWorld {
@@ -67,7 +77,10 @@ class RagWorld {
     this.uploadedDocIds = [];
     this.activeChatId = null;
     this.capturedLLMPayload = null;
+    this.capturedGroqPayload = null;
+    this.toolResult = null;
     this.axiosStub = null;
+    this.axiosGetStub = null;
   }
 }
 
