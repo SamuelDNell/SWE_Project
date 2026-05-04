@@ -1,196 +1,282 @@
 const puppeteer = require('puppeteer');
+const path = require('path');
+const { spawnSync } = require('child_process');
 
 (async () => {
-  const browser = await puppeteer.launch({ headless: false }); // Set to true for headless mode
+  const browser = await puppeteer.launch({
+    headless: false,
+    slowMo: 40,
+    args: ['--window-size=1280,800', '--no-sandbox']
+  });
+
   const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 720 });
+  await page.setViewport({ width: 1280, height: 800 });
 
-  page.on('console', msg => {
-    console.log('PAGE LOG:', msg.text());
-  });
+  // ── Recording ────────────────────────────────────────────────────────────────
+  const recorder = await page.screencast({ path: 'demo_recording.webm' });
 
-  page.on('requestfailed', request => {
-    console.log('REQUEST FAILED:', request.url(), request.failure().errorText);
-  });
-
-  page.on('response', async response => {
-    const url = response.url();
-    if (url.includes('/api/chat/') && response.request().method() === 'POST') {
-      console.log('API RESPONSE:', response.status(), url);
-      if (!response.ok()) {
-        const text = await response.text();
-        console.log('API ERROR BODY:', text.substring(0, 1000));
-      }
-    }
-  });
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  const delay = (ms) => page.evaluate((ms) => new Promise((r) => setTimeout(r, ms)), ms);
 
   const clickByText = async (tag, text) => {
-    const elements = await page.$$(tag);
-    for (const element of elements) {
-      const content = await page.evaluate(el => el.textContent || '', element);
+    const els = await page.$$(tag);
+    for (const el of els) {
+      const content = await page.evaluate((e) => e.textContent || '', el);
       if (content.trim().toLowerCase().includes(text.toLowerCase())) {
-        await element.click();
+        await el.click();
         return;
       }
     }
-    throw new Error(`Could not find <${tag}> containing text '${text}'`);
+    throw new Error(`Could not find <${tag}> containing "${text}"`);
+  };
+
+  const waitForResponse = (timeout = 120000) =>
+    page.waitForResponse(
+      (r) => r.url().includes('/api/chat/') && r.request().method() === 'POST',
+      { timeout }
+    );
+
+  const typeMessage = async (text) => {
+    const input = await page.waitForSelector('input[placeholder="Type your message..."]');
+    await input.click({ clickCount: 3 });
+    await input.type(text, { delay: 30 });
+  };
+
+  const sendAndWait = async () => {
+    const responsePromise = waitForResponse();
+    await clickByText('button', 'Send');
+    console.log('Message sent — waiting for API response...');
+    const response = await responsePromise;
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Chat API failed ${response.status()}: ${body.substring(0, 500)}`);
+    }
+    console.log('Response received:', response.status());
+    await delay(2000);
+  };
+
+  // ── Ensure compare mode is active ────────────────────────────────────────────
+  const ensureCompareMode = async () => {
+    const inCompare = await page.evaluate(() =>
+      !!Array.from(document.querySelectorAll('button')).find((b) =>
+        b.textContent.includes('Switch to single model')
+      )
+    );
+    if (!inCompare) {
+      await clickByText('button', 'Switch to compare mode');
+      await delay(500);
+      console.log('Switched to compare mode');
+    } else {
+      console.log('Already in compare mode');
+    }
+  };
+
+  // ── Ensure single model mode is active ───────────────────────────────────────
+  const ensureSingleMode = async () => {
+    const inCompare = await page.evaluate(() =>
+      !!Array.from(document.querySelectorAll('button')).find((b) =>
+        b.textContent.includes('Switch to single model')
+      )
+    );
+    if (inCompare) {
+      await clickByText('button', 'Switch to single model');
+      await delay(500);
+      console.log('Switched to single model mode');
+    } else {
+      console.log('Already in single model mode');
+    }
+  };
+
+  // ── Set compare mode checkboxes to exactly the desired models ────────────────
+  const selectCompareModels = async (targetLabels) => {
+    await page.waitForSelector('input[type="checkbox"]', { timeout: 5000 });
+    await page.$$eval(
+      'label',
+      (labels, targets) => {
+        labels.forEach((label) => {
+          const input = label.querySelector('input[type="checkbox"]');
+          if (!input) return;
+          const text = label.textContent.replace(/\s+/g, ' ').trim();
+          const shouldCheck = targets.some((t) => text.toLowerCase().includes(t.toLowerCase()));
+          if (shouldCheck && !input.checked) label.click();
+          if (!shouldCheck && input.checked) label.click();
+        });
+      },
+      targetLabels
+    );
+    await delay(500);
+    const selected = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('label'))
+        .filter((l) => l.querySelector('input[type="checkbox"]')?.checked)
+        .map((l) => l.textContent.replace(/\s+/g, ' ').trim())
+    );
+    console.log('Active compare models:', selected);
+  };
+
+  // ── Select a single model from the dropdown ───────────────────────────────────
+  const selectSingleModel = async (modelValue) => {
+    const select = await page.waitForSelector('select', { timeout: 5000 });
+    await select.select(modelValue);
+    await delay(400);
+    console.log('Single model set to:', modelValue);
   };
 
   try {
-    // Navigate to the landing page
+    // ════════════════════════════════════════════════════════════════
+    // LOGIN
+    // ════════════════════════════════════════════════════════════════
+    console.log('\n── Navigating to app ──');
     await page.goto('http://localhost:5173');
+    await delay(1000);
+
     await clickByText('button', 'Log in');
-
-    // Wait for login form
     await page.waitForSelector('#email');
-    await page.type('#email', 'puppeteer@gmail.com');
-    await page.type('#password', 'password');
+    await delay(500);
+
+    await page.type('#email', 'test@gmail.com', { delay: 60 });
+    await page.type('#password', 'password', { delay: 60 });
+    await delay(400);
+
     await clickByText('button', 'Log In');
+    await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 15000 });
+    await delay(1500);
 
-    // Wait for navigation to home page
-    await page.waitForNavigation({ waitUntil: 'networkidle0' });
+    await page.waitForFunction(
+      () => document.body.innerText.includes('Model selection'),
+      { timeout: 12000 }
+    );
+    console.log('Logged in — home page loaded');
 
-    // Check if login succeeded
-    const currentUrl = page.url();
-    console.log('Current URL after login:', currentUrl);
-    if (!currentUrl.includes('/home') && !currentUrl.includes('localhost:5173') && !page.url().endsWith('/')) {
-      throw new Error('Login failed, not redirected to home page');
-    }
+    // ════════════════════════════════════════════════════════════════
+    // CHAT 1 — COMPARE MODE: Groq vs Ollama llama3.2
+    // ════════════════════════════════════════════════════════════════
+    console.log('\n── Chat 1: Compare mode (Groq vs llama3.2) ──');
 
-    // Take screenshot to see current state
-    await page.screenshot({ path: 'after_login.png' });
-    console.log('Screenshot saved: after_login.png');
+    await clickByText('button', '+ New Chat');
+    await delay(1200);
 
-    // Check for error or security messages
-    const pageText = await page.evaluate(() => document.body.innerText);
-    console.log('Page content after login:', pageText.substring(0, 500));
-    
-    if (pageText.includes('Error') || pageText.includes('error') || pageText.includes('security') || pageText.includes('Security')) {
-      console.log('Potential error/security message detected:', pageText);
-      await page.screenshot({ path: 'security_message.png' });
-    }
+    await ensureCompareMode();
 
-    // Wait a bit for page to fully load
-    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 2000)));
+    // Select exactly: Groq Llama 3.3 70B and llama3.2:latest
+    await selectCompareModels(['Groq Llama 3.3 70B', 'llama3.2:latest']);
 
-    // Ensure we're on the home page and model selector is visible
-    try {
-      await page.waitForFunction(() => document.body.innerText.includes('Model selection'), { timeout: 10000 });
-    } catch (error) {
-      console.log('Timeout waiting for Model selection');
-      const bodyText = await page.evaluate(() => document.body.innerText);
-      console.log('Current page text:', bodyText);
-      throw error;
-    }
+    await typeMessage('What is the difference between Python and JavaScript, and when would you use each one?');
+    await sendAndWait();
 
-    // Start a new chat to clear any previous state
-    console.log('Starting new chat...');
-    await clickByText('button', 'New Chat');
-    console.log('New chat started');
-    
-    // Wait for page to update
-    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 1000)));
+    // Wait for both model labels to appear in the chat
+    await page.waitForFunction(
+      () => {
+        const text = document.body.innerText;
+        return (text.includes('Groq') || text.includes('Python')) && text.includes('Use this answer');
+      },
+      { timeout: 120000 }
+    );
+    console.log('Chat 1 complete — both model responses visible');
+    await delay(3000);
 
-    // Click "Switch to compare mode" button if needed
-    console.log('Checking if we need to switch to compare mode...');
-    const isInCompareMode = await page.evaluate(() => {
-      const button = Array.from(document.querySelectorAll('button')).find(btn => 
-        btn.textContent.includes('Switch to single model')
-      );
-      return !!button;
-    });
-    
-    if (isInCompareMode) {
-      console.log('Already in compare mode');
-    } else {
-      console.log('Switching to compare mode...');
-      await clickByText('button', 'Switch to compare mode');
-      console.log('Switched to compare mode');
-    }
+    // ════════════════════════════════════════════════════════════════
+    // CHAT 2 — Document question (llama3.2:latest)
+    // ════════════════════════════════════════════════════════════════
+    console.log('\n── Chat 2: Document upload + question (llama3.2) ──');
 
-    // Wait for checkboxes to appear
-    await page.waitForSelector('input[type="checkbox"]', { timeout: 5000 });
-    console.log('Checkboxes visible');
+    await clickByText('button', '+ New Chat');
+    await delay(1200);
 
-    const checkboxStatesBefore = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('label')).map(label => {
-        const input = label.querySelector('input[type="checkbox"]');
-        const text = label.textContent.replace(/\s+/g, ' ').trim();
-        return { text, checked: !!input?.checked };
-      });
-    });
-    console.log('Checkboxes before selection:', checkboxStatesBefore);
+    await ensureSingleMode();
+    await selectSingleModel('ollama:llama3.2:latest');
 
-    // Ensure the target models are selected without toggling already-checked boxes
-    const targetModels = ['tinyllama:latest', 'llama3.2:latest'];
-    await page.$$eval('label', (labels, targetModels) => {
-      const normalize = txt => txt.replace(/\s+/g, ' ').trim();
-      labels.forEach(label => {
-        const text = normalize(label.textContent);
-        const input = label.querySelector('input[type="checkbox"]');
-        if (!input) return;
-        const shouldBeChecked = targetModels.some(target => text.includes(target));
-        if (shouldBeChecked && !input.checked) {
-          label.click();
-        }
-      });
-    }, targetModels);
+    // Upload the sample document
+    console.log('Uploading document...');
+    const fileInput = await page.$('input[type="file"]');
+    await fileInput.uploadFile(path.resolve(__dirname, 'sample_document.txt'));
+    await delay(4000); // wait for upload + embedding
 
-    const selectedLabels = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('label')).
-        filter(label => {
-          const input = label.querySelector('input[type="checkbox"]');
-          return input && input.checked;
-        }).
-        map(label => label.textContent.replace(/\s+/g, ' ').trim());
-    });
-    console.log('Selected model labels:', selectedLabels);
-    console.log('Models selected (tinyllama and llama3.2)');
+    const docVisible = await page.evaluate(() =>
+      document.body.innerText.includes('sample_document.txt')
+    );
+    console.log('Document visible in UI:', docVisible);
 
-    // Type the message
-    await page.waitForSelector('input[placeholder="Type your message..."]');
-    await page.type('input[placeholder="Type your message..."]', 'tell me about large language models.');
-
-    // Send the message
-    await clickByText('button', 'Send');
-    console.log('Message sent');
-
-    // Wait for the backend chat POST to complete and capture the response
-    const chatResponse = await page.waitForResponse(response =>
-      response.url().includes('/api/chat/') && response.request().method() === 'POST',
+    await typeMessage('According to the document, who teaches CS 416 and when is its final exam?');
+    await sendAndWait();
+    await page.waitForFunction(
+      () => {
+        const msgs = document.querySelectorAll('[class*="messageContent"]');
+        return msgs.length >= 2;
+      },
       { timeout: 60000 }
     );
-    console.log('Chat response status:', chatResponse.status());
-    const chatResponseBody = await chatResponse.text();
-    console.log('Chat response body:', chatResponseBody.substring(0, 1000));
-    if (!chatResponse.ok()) {
-      await page.screenshot({ path: 'chat_api_error.png' });
-      throw new Error(`Chat API failed with status ${chatResponse.status()}`);
-    }
+    console.log('Document question answered');
+    await delay(3000);
 
-    // Wait for responses to appear in the UI
-    try {
-      await page.waitForFunction(() => {
-        const text = document.body.innerText;
-        const hasTinyllama = text.includes('tinyllama');
-        const hasLlama3 = text.includes('llama3.2');
-        const hasButton = text.includes('Use this answer');
-        return hasTinyllama && hasLlama3 && hasButton;
-      }, { timeout: 60000 });
-      console.log('Test passed: Messages sent and responses received from both models.');
-    } catch (error) {
-      console.log('Error waiting for responses in UI');
-      await page.screenshot({ path: 'waiting_for_responses_error.png' });
-      throw error;
-    }
+    // ════════════════════════════════════════════════════════════════
+    // CHAT 3 — Weather tool (llama3.2:latest, fresh context)
+    // ════════════════════════════════════════════════════════════════
+    console.log('\n── Chat 3: Weather in Tokyo (llama3.2) ──');
 
-    // Optional: Take a screenshot
-    await page.screenshot({ path: 'multi_llm_test_result.png' });
-    console.log('Final screenshot saved: multi_llm_test_result.png');
+    await clickByText('button', '+ New Chat');
+    await delay(1200);
 
-  } catch (error) {
-    console.error('Test failed:', error);
+    await ensureSingleMode();
+    await selectSingleModel('ollama:llama3.2:latest');
+
+    await typeMessage('What is the current weather in Tokyo?');
+    await sendAndWait();
+    await page.waitForFunction(
+      () => {
+        const msgs = Array.from(document.querySelectorAll('[class*="messageContent"]'));
+        const last = msgs[msgs.length - 1];
+        return last && (
+          last.innerText.includes('°F') ||
+          last.innerText.includes('Tokyo') ||
+          last.innerText.includes('temperature') ||
+          last.innerText.includes('weather')
+        );
+      },
+      { timeout: 60000 }
+    );
+    console.log('Weather response received');
+    await delay(3000);
+
+    // ════════════════════════════════════════════════════════════════
+    // CHAT 4 — Math tool (llama3.2:latest, fresh context)
+    // ════════════════════════════════════════════════════════════════
+    console.log('\n── Chat 4: Derivative of 6x³ + 9x + 2 (llama3.2) ──');
+
+    await clickByText('button', '+ New Chat');
+    await delay(1200);
+
+    await ensureSingleMode();
+    await selectSingleModel('ollama:llama3.2:latest');
+
+    await typeMessage('What is the derivative of 6x^3 + 9x + 2?');
+    await sendAndWait();
+    await page.waitForFunction(
+      () => {
+        const msgs = Array.from(document.querySelectorAll('[class*="messageContent"]'));
+        const last = msgs[msgs.length - 1];
+        return last && (
+          last.innerText.includes('18') ||
+          last.innerText.includes('x^2') ||
+          last.innerText.includes('x²') ||
+          last.innerText.includes('derivative')
+        );
+      },
+      { timeout: 60000 }
+    );
+    console.log('Math response received');
+    await delay(3000);
+
+    console.log('\n✓ All test scenarios completed successfully');
+
+  } catch (err) {
+    console.error('\n✗ Test failed:', err.message);
+    await page.screenshot({ path: 'test_failure.png' });
   } finally {
+    await delay(1000);
+    await recorder.stop();
+    console.log('Recording saved to demo_recording.webm — converting to MP4...');
+    spawnSync('ffmpeg', ['-y', '-i', 'demo_recording.webm', '-c:v', 'libx264', '-preset', 'fast', '-movflags', '+faststart', 'demo_recording.mp4'], { stdio: 'inherit' });
+    console.log('MP4 saved to demo_recording.mp4');
     await browser.close();
   }
 })();

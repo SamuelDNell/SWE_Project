@@ -1,0 +1,13 @@
+Rutgers University — CS Department Course Catalog (Spring 2026)
+
+CS 314: Principles of Programming Languages
+Covers functional programming paradigms, type theory, and formal language design. Topics include lambda calculus, type inference, and interpreter construction. Meets Tuesdays and Thursdays at 10:20 AM in Hill Center Room 114. Professor Angela Rivera. Prerequisites: CS 112 and CS 205.
+
+CS 416: Operating Systems Design
+Explores process scheduling, virtual memory management, file system internals, and concurrency primitives. Students implement a custom shell and a memory allocator over the course of the semester. Taught by Professor David Kim. Final exam is scheduled for May 15th at 8:00 AM in SEC 111. Prerequisites: CS 211 and CS 214.
+
+CS 440: Introduction to Artificial Intelligence
+Introduces search algorithms, constraint satisfaction, probabilistic reasoning, and neural networks. Students complete five programming assignments, each building on the previous. Office hours are held every Monday from 2:00 PM to 4:00 PM. Prerequisites: CS 112, Math 250.
+
+CS 461: Machine Learning
+Covers supervised and unsupervised learning, gradient descent, regularization, decision trees, and deep learning. Textbook: "Pattern Recognition and Machine Learning" by Bishop. Midterm is worth 30% of the final grade. Professor Sarah Chen teaches two sections: one at 9:50 AM and one at 1:10 PM.
