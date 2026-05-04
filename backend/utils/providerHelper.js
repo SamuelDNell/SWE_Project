@@ -1,6 +1,7 @@
 const { OpenAI } = require('openai');
 const { Anthropic } = require('@anthropic-ai/sdk');
 const Groq = require('groq-sdk');
+const { GoogleGenAI } = require('@google/genai');
 const { ollamaMathChat } = require('./ollamaMathChat');
 
 const OLLAMA_BASE_URL = 'http://localhost:11434';
@@ -8,14 +9,18 @@ const OLLAMA_BASE_URL = 'http://localhost:11434';
 const openaiApiKey = process.env.OPENAI_API_KEY;
 const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
 const groqApiKey = process.env.GROQ_API_KEY;
+const googleApiKey = process.env.GOOGLE_API_KEY;
 
 const openaiClient = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
 const anthropicClient = anthropicApiKey ? new Anthropic({ apiKey: anthropicApiKey }) : null;
 const groqClient = groqApiKey ? new Groq({ apiKey: groqApiKey }) : null;
+const genAI = googleApiKey ? new GoogleGenAI({ apiKey: googleApiKey }) : null;
 
 const PROVIDER_MODELS = [
   { name: 'groq:llama-3.3-70b-versatile', label: 'Groq - Llama 3.3 70B' },
-  { name: 'groq:llama-3.1-8b-instant', label: 'Groq - Llama 3.1 8B' }
+  { name: 'groq:llama-3.1-8b-instant', label: 'Groq - Llama 3.1 8B' },
+  { name: 'gemini:gemini-2.0-flash', label: 'Google - Gemini 2.0 Flash' },
+  { name: 'gemini:gemini-2.0-flash-lite', label: 'Google - Gemini 2.0 Flash Lite' }
 ];
 
 const OLLAMA_DEFAULT_MODELS = [
@@ -33,12 +38,14 @@ const parseModelKey = (selectedModel) => {
     if (provider === 'openai') return { provider: 'openai', model: modelName };
     if (provider === 'anthropic') return { provider: 'anthropic', model: modelName };
     if (provider === 'groq') return { provider: 'groq', model: modelName };
+    if (provider === 'gemini') return { provider: 'gemini', model: modelName };
     if (provider === 'ollama') return { provider: 'ollama', model: modelName };
   }
 
   const normalized = selectedModel.toLowerCase();
   if (normalized.startsWith('gpt-')) return { provider: 'openai', model: selectedModel };
   if (normalized.startsWith('claude')) return { provider: 'anthropic', model: selectedModel };
+  if (normalized.startsWith('gemini')) return { provider: 'gemini', model: selectedModel };
   if (normalized.includes('llama') && !selectedModel.startsWith('ollama:')) return { provider: 'groq', model: selectedModel };
   if (normalized.includes('llama')) return { provider: 'ollama', model: selectedModel.replace(/^ollama:/, '') };
 
@@ -134,6 +141,28 @@ const queryProvider = async (selectedModel, messages, documentContext) => {
     });
 
     return response.choices?.[0]?.message?.content?.trim() || '';
+  }
+
+  if (provider === 'gemini') {
+    if (!genAI) {
+      throw new Error('Google API key is not configured. Set GOOGLE_API_KEY in .env.');
+    }
+
+    // Gemini requires history in user/model alternation; last message is sent separately
+    const history = cleanMessages.slice(0, -1).map((msg) => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    }));
+    const lastMessage = cleanMessages[cleanMessages.length - 1];
+
+    const chat = genAI.chats.create({
+      model,
+      config: { systemInstruction: systemPrompt },
+      history
+    });
+
+    const response = await chat.sendMessage({ message: lastMessage.content });
+    return response.text?.trim() || '';
   }
 
   if (provider === 'ollama') {

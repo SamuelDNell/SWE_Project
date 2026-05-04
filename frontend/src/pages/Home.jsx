@@ -9,6 +9,8 @@ import styles from './Home.module.css'
 const DEFAULT_MODEL_OPTIONS = [
     'groq:llama-3.3-70b-versatile',
     'groq:llama-3.1-8b-instant',
+    'gemini:gemini-2.0-flash',
+    'gemini:gemini-2.0-flash-lite',
     'ollama:llama3.2:latest',
     'ollama:llama2:7b',
     'ollama:llama4:latest'
@@ -424,9 +426,11 @@ useEffect(() => {
         const labelMap = {
             'groq:llama-3.3-70b-versatile': 'Groq Llama 3.3 70B',
             'groq:llama-3.1-8b-instant': 'Groq Llama 3.1 8B',
+            'gemini:gemini-2.0-flash': 'Gemini 2.0 Flash',
+            'gemini:gemini-2.0-flash-lite': 'Gemini 2.0 Flash Lite',
         };
         if (labelMap[modelKey]) return labelMap[modelKey];
-        const prefixes = ['groq', 'ollama'];
+        const prefixes = ['groq', 'gemini', 'ollama'];
         for (const prefix of prefixes) {
             if (modelKey.startsWith(prefix + ':')) {
                 return modelKey.slice(prefix.length + 1);
