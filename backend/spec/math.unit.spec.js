@@ -115,9 +115,9 @@ describe('Math Tooling Unit Tests', () => {
       expect(prompt).toContain('$$');
     });
 
-    it('instructs the model to always call the tool before computing', () => {
+    it('instructs the model to use the tool for calculations', () => {
       const prompt = buildSystemPrompt(null, 'ollama');
-      expect(prompt).toContain('Never compute math mentally');
+      expect(prompt).toContain('Use it for any numeric computation');
     });
 
     it('does NOT include math instructions for openai', () => {
@@ -162,15 +162,9 @@ describe('Math Tooling Unit Tests', () => {
       expect(prompt).toContain('$expression$');
     });
 
-    it('instructs groq to show step-by-step working', () => {
+    it('includes solve_math tool instruction for groq', () => {
       const prompt = buildSystemPrompt(null, 'groq');
-      expect(prompt).toContain('step by step');
-    });
-
-    it('does NOT include the solve_math tool instruction for groq', () => {
-      const prompt = buildSystemPrompt(null, 'groq');
-      expect(prompt).not.toContain('solve_math');
-      expect(prompt).not.toContain('Never compute math mentally');
+      expect(prompt).toContain('solve_math');
     });
 
     it('still includes the Knightly preamble for groq', () => {
@@ -189,11 +183,12 @@ describe('Math Tooling Unit Tests', () => {
       expect(prompt).not.toContain('Block math');
     });
 
-    it('ollama gets tool calling instructions, groq gets formatting-only instructions', () => {
+    it('both ollama and groq get solve_math and LaTeX instructions', () => {
       const ollamaPrompt = buildSystemPrompt(null, 'ollama');
       const groqPrompt = buildSystemPrompt(null, 'groq');
       expect(ollamaPrompt).toContain('solve_math');
-      expect(groqPrompt).not.toContain('solve_math');
+      expect(groqPrompt).toContain('solve_math');
+      expect(ollamaPrompt).toContain('LaTeX');
       expect(groqPrompt).toContain('LaTeX');
     });
   });

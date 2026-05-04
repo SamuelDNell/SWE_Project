@@ -265,9 +265,9 @@ describe('Groq LaTeX — buildSystemPrompt integration', () => {
     expect(prompt).toContain('$expression$');
   });
 
-  it('groq system prompt does not contain solve_math tool instruction', () => {
+  it('groq system prompt contains solve_math tool instruction', () => {
     const prompt = buildSystemPrompt(null, 'groq');
-    expect(prompt).not.toContain('solve_math');
+    expect(prompt).toContain('solve_math');
   });
 
   it('ollama system prompt contains solve_math tool instruction', () => {
