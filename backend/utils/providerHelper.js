@@ -2,6 +2,7 @@ const axios = require('axios');
 const { OpenAI } = require('openai');
 const { Anthropic } = require('@anthropic-ai/sdk');
 const { GoogleGenAI } = require('@google/genai');
+const { VertexAI } = require('@google-cloud/vertexai');
 
 const openaiApiKey = process.env.OPENAI_API_KEY;
 const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
@@ -10,6 +11,14 @@ const googleApiKey = process.env.GOOGLE_API_KEY;
 const openaiClient = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
 const anthropicClient = anthropicApiKey ? new Anthropic({ apiKey: anthropicApiKey }) : null;
 const genAI = googleApiKey ? new GoogleGenAI({ apiKey: googleApiKey }) : null;
+const vertexAI = new VertexAI({
+  project: process.env.GOOGLE_CLOUD_PROJECT,
+  location: process.env.GOOGLE_CLOUD_LOCATION
+});
+
+const vertexModel = vertexAI.getGenerativeModel({
+ model: 'gemini-2.5-flash'
+});
 
 const PROVIDER_MODELS = [
   { name: 'openai:gpt-4o', label: 'OpenAI - gpt-4o' },
@@ -48,11 +57,33 @@ const parseModelKey = (selectedModel) => {
 };
 
 const buildSystemPrompt = (documentContext) => {
-  let prompt = 'You are Knightly, a smart and concise AI assistant for Rutgers University students. Answer questions directly and use uploaded documents as relevant context.';
+  let prompt = `
+You are Knightly, an AI assistant for Rutgers students.
+
+If document context is provided, you MUST answer questions using the uploaded documents.
+
+You ARE allowed to:
+- summarize documents
+- explain documents
+- answer questions about documents
+- quote important sections briefly
+- analyze uploaded files
+
+If the user asks about the uploaded document, prioritize the document context over general knowledge.
+
+If the answer is not found in the document context, then use general knowledge.
+
+`;
+
   if (documentContext) {
-    prompt += `\n\nUse the following documents as context when answering user questions:\n${documentContext}`;
+    prompt += `
+
+DOCUMENT CONTEXT:
+${documentContext}
+
+`;
   }
-  prompt += '\n\nIf the user asks a question unrelated to the documents, answer using your general knowledge and do not invent file contents.';
+
   return prompt;
 };
 
@@ -110,25 +141,22 @@ const queryProvider = async (selectedModel, messages, documentContext) => {
   }
 
   if (provider === 'gemini') {
-    if (!genAI) {
-      throw new Error('Google API key is not configured. Set GOOGLE_API_KEY in .env.');
-    }
 
-    const history = cleanMessages.slice(0, -1).map((msg) => ({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }]
-    }));
-    const lastMessage = cleanMessages[cleanMessages.length - 1];
+  const prompt = `
+${systemPrompt}
 
-    const chat = genAI.chats.create({
-      model,
-      config: { systemInstruction: systemPrompt },
-      history
-    });
+Conversation:
+${cleanMessages.map((m) => `${m.role}: ${m.content}`).join('\n')}
+`;
 
-    const response = await chat.sendMessage({ message: lastMessage.content });
-    return response.text.trim();
-  }
+  const result = await vertexModel.generateContent({
+    contents: [{ role: 'user', parts: [{ text: prompt }] }]
+  });
+
+  const response = result.response;
+
+  return response.candidates[0].content.parts[0].text.trim();
+}
 
   if (provider === 'ollama') {
     const response = await axios.post('http://localhost:11434/api/chat', {

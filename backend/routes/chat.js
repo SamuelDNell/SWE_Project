@@ -6,6 +6,8 @@ const verifyToken = require('../middleware/auth');
 const Chat = require('../models/Chat');
 const Document = require('../models/Document');
 const { queryProvider, getAvailableProviderModels } = require('../utils/providerHelper');
+const { addDocumentToVectorStore, retrieveRelevantContext } = require('../utils/ragHelper');
+const { isMathQuery, computeMath } = require('../utils/mathHelper');
 
 const router = express.Router();
 const upload = multer({
@@ -86,7 +88,10 @@ router.post('/documents/upload', verifyToken, upload.single('document'), async (
     });
     await document.save();
 
-    res.json(document);
+// Add document to vector store for semantic retrieval
+await addDocumentToVectorStore(document._id, content);
+
+res.json(document);
   } catch (err) {
     console.error('DOCUMENT UPLOAD ERROR:', err);
     res.status(500).json({ msg: 'Failed to upload document', error: err.message });
@@ -237,6 +242,30 @@ router.post('/:chatId', verifyToken, async (req, res) => {
     }
 
     chat.messages.push({ role: 'user', content: message });
+    // Math tool handling
+if (isMathQuery(message)) {
+  const mathResult = computeMath(message);
+
+  if (mathResult.success) {
+    chat.messages.push({
+      role: 'assistant',
+      content: `Math Tool Result: ${mathResult.result}`,
+      model: 'math-tool'
+    });
+
+    await chat.save();
+
+    return res.json({
+      responses: [
+        {
+          model: 'math-tool',
+          content: `Math Tool Result: ${mathResult.result}`
+        }
+      ],
+      chat
+    });
+  }
+}
 
     const selectedModels = Array.isArray(models) && models.length
       ? models
@@ -248,9 +277,9 @@ router.post('/:chatId', verifyToken, async (req, res) => {
       ? await Document.find({ _id: { $in: activeDocumentIds }, user: req.user.id })
       : [];
 
-    const documentContext = documents
-      .map((doc) => `File: ${doc.filename}\n${doc.content.slice(0, 2800)}`)
-      .join('\n\n');
+    const documentContext = activeDocumentIds.length
+  ? await retrieveRelevantContext(activeDocumentIds, message)
+  : '';
 
     const results = await Promise.allSettled(
       selectedModels.map((selectedModel) =>
